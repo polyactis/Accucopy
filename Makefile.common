@@ -1,0 +1,92 @@
+
+.SUFFIXES:	.i .cc .c .so .o _wrap.o .py
+.PHONY:	swig clean_subdirs subdirs $(SUBDIRS)
+
+IncludeDirs = -I ~/script/ -I ~/script/vcflib/
+BoostLib  = -lboost_program_options -lboost_iostreams
+HDF5Lib  = -lhdf5_cpp -lhdf5 -L/usr/lib/x86_64-linux-gnu/hdf5/serial
+
+## CXXTARGETS, CXXLDFLAGS, CTARGETS, CLDFLAGS, ExtraTargets will be defined in child Makefiles
+#CXXTARGETS	=
+#CXXStaticTargets	=
+StaticStartFlags	= -Wl,--no-as-needed -Wl,-Bstatic -static-libgcc -static-libstdc++
+StaticEndFlags	= -Wl,-Bdynamic -lz -lpthread -ldl
+CXXFLAGS	= -fPIC -O3 -std=c++11 -Wl,--no-as-needed -I /usr/include/hdf5/serial
+# -std=c++0x
+# -std=c++11
+# -std=gnu++11
+CXXCOMPILER	= g++
+CXXLDFLAGS	= $(HDF5Lib)
+
+#CTARGETS	=
+CFLAGS		= -fPIC -O2 -Wl,--no-as-needed
+CCOMPILER	= gcc
+#CLDFLAGS	=
+
+#SharedLibTargets	=
+SharedLibFlags	= -shared -fPIC
+
+#StaticLibTargets	=
+
+#ExtraTargets
+#SRCS
+
+all:	depend $(CXXStaticTargets) $(CXXTARGETS) $(CTARGETS) $(SharedLibTargets) $(StaticLibTargets) $(ExtraTargets) subdirs
+
+
+$(StaticLibTargets):	%.a:	%.o
+	-ar crfvs $@ $<
+
+$(SharedLibTargets):	%.so:	%.o
+	-$(CXXCOMPILER) $< $(SharedLibFlags) -o $@ $(CXXLDFLAGS)
+
+#.o.so:
+#	-$(CXXCOMPILER) $< $(SharedLibFlags) -o $@ $(CXXLDFLAGS)
+
+$(CXXTARGETS):	%:	%.o
+	-$(CXXCOMPILER) $< $(CXXFLAGS) -o $@ $(CXXLDFLAGS)
+
+$(CXXStaticTargets):	%:	%.o
+	-$(CXXCOMPILER) $< $(CXXFLAGS) -o $@ $(StaticStartFlags) $(CXXLDFLAGS) $(StaticEndFlags)
+
+.cc.o:
+	-$(CXXCOMPILER) $< $(CXXFLAGS) $(IncludeDirs) -c -o $@
+
+$(CTARGETS):	%:	%.o
+	-$(CCOMPILER) $< $(CFLAGS) -o $@ $(CLDFLAGS)
+
+.c.o:
+	-$(CCOMPILER) $< $(CFLAGS) $(IncludeDirs) -c -o $@
+
+#.c:	$(wildcard ~/script/pymodule/include/*.h)
+#.cc:	$(wildcard ~/script/pymodule/include/*.h)
+
+### 2013.08.21 generate auto-dependency for each source code file through "gcc -MM". so that change of .h files would trigger re-compilation as well.
+
+depend: .depend
+
+.depend: $(SRCS)
+	rm -f ./.depend
+	-$(CXXCOMPILER) $^ $(CXXFLAGS) $(IncludeDirs) -MM >>./.depend;
+
+include .depend
+
+
+subdirs:
+	for dir in $(SUBDIRS); do \
+		$(MAKE) -C $$dir all; \
+	done
+
+clean_subdirs:
+	for dir in $(SUBDIRS); do \
+		$(MAKE) -C $$dir clean; \
+	done
+
+common_clean:
+	rm -f ./.depend
+	-rm *.h.gch
+	-rm -f *.o *.so $(CXXStaticTargets) $(CXXTARGETS) $(CTARGETS) $(SharedLibTargets) $(StaticLibTargets) $(ExtraTargets)
+#$(CXXTARGETS) $(CTARGETS) $(ExtraTargets) $(SharedLibTargets)
+
+clean:	clean_subdirs common_clean
+

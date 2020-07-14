@@ -1,0 +1,12 @@
+20191122
+
+Running "make" in this folder creates the base docker image, polyactis/accucopy:18, with all dependent packages but without the accucopy binary.
+
+Running "make" in the subfolder "updateDocker" adds the binaries to the docker image, thus completing the image.
+
+
+# first to generate the base image: polyactis/accucopy:18
+$ make
+
+# then to add binaries to polyactis/accucopy
+$ cd updateDocker; make

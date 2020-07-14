@@ -1,0 +1,8 @@
+reference_genome_name	hs37d5
+read_length	101
+window_size	500
+reference_index_folder_path	/y/hlab/AccurityTestData/refData
+reference_genome_fasta_path	/y/hlab/AccurityTestData/refData/hs37d5.fa
+samtools_path	/y/program/bin/samtools
+freebayes_path	/y/program/bin/freebayes
+accurity_path	/y/program/Sunset/Accurity

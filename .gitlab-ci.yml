@@ -1,0 +1,614 @@
+before_script:
+  - echo "before script"
+  - export PATH="$HOME/.cargo/bin:$PATH"
+
+after_script:
+  - echo "after script"
+
+stages:
+  - build_d
+  - build_r
+  - test_1
+  - test_2
+
+build_debug:
+  stage: build_d
+  script:
+    - echo "Build for debug"
+    - pwd
+    - export
+    - cd src_o; make clean; make debug
+    - mv debug ../software
+    - pwd
+  artifacts:
+    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    expire_in: 4 yrs
+    paths:
+    - software
+
+build_release:
+  stage: build_r
+  script:
+    - echo "Build for release"
+    - pwd
+    - cd src_o; make clean; make release
+    - mv release ../software
+    - pwd
+  artifacts:
+    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    expire_in: 4 yrs
+    paths:
+    - software
+  dependencies:
+    - build_debug
+
+
+HCC1187_10X_0_1_noise_20:
+  stage: test_1
+  script:
+    - echo "Test HCC1187_10X_0.1_noise_20";
+    - pwd; ls
+    - test/test_tcga.py -f /y/hlab/AccurityTestData/HCC1187/mixed_sample/ --segment_stddev_divider 20 -t purity_0.1 -n normal_5X -c 4 -o HCC1187_10X_0_1_noise_20 -w pyflow
+    - test/judge_result.py -i HCC1187_10X_0_1_noise_20/infer.out.tsv -u 0.077 -d 2.7
+  artifacts:
+    when: always
+    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    expire_in: 12 mos
+    paths:
+    - HCC1187_10X_0_1_noise_20/
+  dependencies:
+    - build_debug
+
+HCC1187_10X_0_3_noise_20:
+  stage: test_2
+  script:
+    - echo "Test HCC1187_10X_0.3_noise_20";
+    - pwd; ls
+    - test/test_tcga.py -f /y/hlab/AccurityTestData/HCC1187/mixed_sample/ --segment_stddev_divider 20 -t purity_0.3 -n normal_5X -c 4 -o HCC1187_10X_0_3_noise_20 -w pyflow
+    - test/judge_result.py -i HCC1187_10X_0_3_noise_20/infer.out.tsv -u 0.241 -d 2.7
+  artifacts:
+    when: always
+    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    expire_in: 12 mos
+    paths:
+    - HCC1187_10X_0_3_noise_20/
+  dependencies:
+    - build_debug
+
+HCC1187_10X_0_3_noise_10:
+  stage: test_1
+  script:
+    - echo "Test HCC1187_10X_0.3_noise_10";
+    - pwd
+    - test/test_tcga.py -f /y/hlab/AccurityTestData/HCC1187/mixed_sample/ --segment_stddev_divider 10 -t purity_0.3 -n normal_5X -c 4 -o HCC1187_10X_0_3_noise_10 -w pyflow
+    - test/judge_result.py -i HCC1187_10X_0_3_noise_10/infer.out.tsv -u 0.241 -d 2.7
+  artifacts:
+    when: always
+    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    expire_in: 12 mos
+    paths:
+    - HCC1187_10X_0_3_noise_10/
+  dependencies:
+    - build_debug
+
+HCC1187_10X_0_4_noise_20:
+  stage: test_2
+  script:
+    - echo "Test HCC1187_10X_0.4_noise_20";
+    - pwd
+    - test/test_tcga.py -f /y/hlab/AccurityTestData/HCC1187/mixed_sample/ --segment_stddev_divider 20 -t purity_0.4 -n normal_5X -c 4 -o HCC1187_10X_0_4_noise_20 -w pyflow
+    - test/judge_result.py -i HCC1187_10X_0_4_noise_20/infer.out.tsv -u 0.331 -d 2.7
+  artifacts:
+    when: always
+    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    expire_in: 12 mos
+    paths:
+    - HCC1187_10X_0_4_noise_20/
+  dependencies:
+    - build_debug
+
+HCC1187_10X_0_4_noise_10:
+  stage: test_1
+  script:
+    - echo "Test HCC1187_10X_0.4_noise_10";
+    - pwd
+    - test/test_tcga.py -f /y/hlab/AccurityTestData/HCC1187/mixed_sample/ --segment_stddev_divider 10 -t purity_0.4 -n normal_5X -c 4 -o HCC1187_10X_0_4_noise_10 -w pyflow
+    - test/judge_result.py -i HCC1187_10X_0_4_noise_10/infer.out.tsv -u 0.331 -d 2.7
+  artifacts:
+    when: always
+    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    expire_in: 12 mos
+    paths:
+    - HCC1187_10X_0_4_noise_10/
+  dependencies:
+    - build_debug
+
+HCC1187_10X_0_6_noise_20:
+  stage: test_1
+  script:
+    - echo "Test HCC1187_10X_0.6 noise 20";
+    - pwd
+    - test/test_tcga.py -f /y/hlab/AccurityTestData/HCC1187/mixed_sample/ --segment_stddev_divider 20 -t purity_0.6 -n normal_5X -c 4 -o HCC1187_10X_0_6_noise_20 -w pyflow
+    - test/judge_result.py -i HCC1187_10X_0_6_noise_20/infer.out.tsv -u 0.526 -d 2.7
+  artifacts:
+    when: always
+    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    expire_in: 12 mos
+    paths:
+    - HCC1187_10X_0_6_noise_20/
+  dependencies:
+    - build_debug
+
+HCC1187_10X_0_6:
+  stage: test_1
+  script:
+    - echo "Test HCC1187_10X_0.6";
+    - pwd
+    - test/test_tcga.py -f /y/hlab/AccurityTestData/HCC1187/mixed_sample/ -t purity_0.6 -n normal_5X -c 4 -o HCC1187_10X_0_6 -w pyflow
+    - test/judge_result.py -i HCC1187_10X_0_6/infer.out.tsv -u 0.526 -d 2.7
+  artifacts:
+    when: always
+    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    expire_in: 12 mos
+    paths:
+    - HCC1187_10X_0_6/
+  dependencies:
+    - build_debug
+
+SNP_HCC1187_10X_0_6:
+  stage: test_2
+  script:
+    - echo "Test H1187_10X purity=0.6 call SNPs, 20 cores";
+    - pwd
+    - test/test_tcga.py -f /y/hlab/AccurityTestData/HCC1187/mixed_sample/ -t purity_0.6 -n normal_5X -c 20 --call_snps -o HCC1187_10X_0_6 -w pyflow
+    - test/judge_result.py -i HCC1187_10X_0_6/infer.out.tsv -u 0.526 -d 2.7
+  artifacts:
+    when: always
+    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    expire_in: 12 mos
+    paths:
+    - HCC1187_10X_0_6/
+  dependencies:
+    - build_debug
+
+HCC1187_10X_0_9:
+  stage: test_2
+  script:
+    - echo "Test HCC1187_10X_0.9";
+    - pwd
+    - test/test_tcga.py -f /y/hlab/AccurityTestData/HCC1187/mixed_sample/ -t purity_0.9 -n normal_5X -c 4 -o HCC1187_10X_0_9 -w pyflow
+    - test/judge_result.py -i HCC1187_10X_0_9/infer.out.tsv -u 0.87 -d 2.7
+  artifacts:
+    when: always
+    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    expire_in: 12 mos
+    paths:
+    - HCC1187_10X_0_9/
+  dependencies:
+    - build_debug
+
+#tcga40X_574_580_06_5411_noise_20:
+#  stage: test_2
+#  script:
+#    - echo "Test reduce noise 20 574_580_TCGA-06-5411_Broad_GSC_vs_1_by_method5_realigned0_reduced0";
+#    - pwd
+#    - test/test_tcga.py -f /y/Sunset/db/individual_alignment/ --segment_stddev_divider 20 -t 574_580_TCGA-06-5411_Broad_GSC_vs_1_by_method5_realigned0_reduced0 -n 578_586_TCGA-06-5411_Broad_GSC_vs_1_by_method5_realigned0_reduced0 -c 4 -o 40X_574_580_06_5411_Broad_noise_20 -w pyflow
+#    - test/judge_result.py -i 40X_574_580_06_5411_Broad_noise_20/infer.out.tsv -u 0.6 -d 2.5 --max_purity_delta 0.3 --max_ploidy_delta 1.3
+#  artifacts:
+#    when: always
+#    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+#    expire_in: 12 mos
+#    paths:
+#    - 40X_574_580_06_5411_Broad_noise_20/
+#  dependencies:
+#    - build_debug
+#
+#tcga40X_574_580_06_5411_Broad:
+#  stage: test_2
+#  script:
+#    - echo "Test 574_580_TCGA-06-5411_Broad_GSC_vs_1_by_method5_realigned0_reduced0";
+#    - pwd
+#    - test/test_tcga.py -f /y/Sunset/db/individual_alignment/ -t 574_580_TCGA-06-5411_Broad_GSC_vs_1_by_method5_realigned0_reduced0 -n 578_586_TCGA-06-5411_Broad_GSC_vs_1_by_method5_realigned0_reduced0 -c 4 -o 40X_574_580__06_5411_Broad -w pyflow
+#    - test/judge_result.py -i 40X_574_580__06_5411_Broad/infer.out.tsv -u 0.6 -d 2.5 --max_purity_delta 0.3 --max_ploidy_delta 1.3
+#  artifacts:
+#    when: always
+#    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+#    expire_in: 12 mos
+#    paths:
+#    - 40X_574_580__06_5411_Broad/
+#  dependencies:
+#    - build_debug
+
+tcga35X_586_595_19_2624_noise_20:
+  stage: test_1
+  script:
+    - echo "Test reduce noise 20 on 586_595_TCGA-19-2624_Broad_GSC_vs_1_by_method5_realigned0_reduced0";
+    - pwd
+    - test/test_tcga.py -f /y/Sunset/db/individual_alignment/ --segment_stddev_divider 20 -t 586_595_TCGA-19-2624_Broad_GSC_vs_1_by_method5_realigned0_reduced0 -n 602_611_TCGA-19-2624_Broad_GSC_vs_1_by_method5_realigned0_reduced0 -c 4 -o 35X_586_595_19_2624_Broad_noise_20 -w pyflow
+    - test/judge_result.py -i 35X_586_595_19_2624_Broad_noise_20/infer.out.tsv -u 0.94571 -d 1.89 --max_purity_delta 0.1 --max_ploidy_delta 0.3
+  artifacts:
+    when: always
+    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    expire_in: 12 mos
+    paths:
+    - 35X_586_595_19_2624_Broad_noise_20/
+  dependencies:
+    - build_debug
+
+#tcga35X_586_595_19_2624_Broad:
+#  stage: test_2
+#  script:
+#    - echo "Test 586_595_TCGA-19-2624_Broad_GSC_vs_1_by_method5_realigned0_reduced0";
+#    - pwd
+#    - test/test_tcga.py -f /y/Sunset/db/individual_alignment/ -t 586_595_TCGA-19-2624_Broad_GSC_vs_1_by_method5_realigned0_reduced0 -n 602_611_TCGA-19-2624_Broad_GSC_vs_1_by_method5_realigned0_reduced0 -c 4 -o 35X_586_595__19_2624_Broad -w pyflow
+#    - test/judge_result.py -i 35X_586_595__19_2624_Broad/infer.out.tsv -u 0.85 -d 2.0 --max_purity_delta 0.1 --max_ploidy_delta 0.3
+#  artifacts:
+#    when: always
+#    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+#    expire_in: 12 mos
+#    paths:
+#    - 35X_586_595__19_2624_Broad/
+#  dependencies:
+#    - build_debug
+
+tcga7X_1590_96__AO_AOJJ_HMS:
+  stage: test_1
+  script:
+    - echo "Test 1590_96_TCGA-AO-A0JJ_HMS_CGCC_vs_633_by_method5_realigned0_reduced0";
+    - pwd
+    - test/test_tcga.py -r hs38d1 -f /y/Sunset/db/individual_alignment/ -t 1590_96_TCGA-AO-A0JJ_HMS_CGCC_vs_633_by_method5_realigned0_reduced0 -n 1574_80_TCGA-AO-A0JJ_HMS_CGCC_vs_633_by_method5_realigned0_reduced0 -c 4 -o 7X_1590_96__AO_AOJJ_HMS -w pyflow
+    - test/judge_result.py -i 7X_1590_96__AO_AOJJ_HMS/infer.out.tsv -u 0.50245 -d 1.9693 --max_purity_delta 0.3 --max_ploidy_delta 1
+  artifacts:
+    when: always
+    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    expire_in: 12 mos
+    paths:
+    - 7X_1590_96__AO_AOJJ_HMS/
+  dependencies:
+    - build_debug
+
+tcga7X_1590_96_AO_AOJJ_noise_20:
+  stage: test_1
+  script:
+    - echo "Test noise reduce 20 on 1590_96_TCGA-AO-A0JJ_HMS_CGCC_vs_633_by_method5_realigned0_reduced0";
+    - pwd
+    - test/test_tcga.py -r hs38d1 -f /y/Sunset/db/individual_alignment/ --segment_stddev_divider 20 -t 1590_96_TCGA-AO-A0JJ_HMS_CGCC_vs_633_by_method5_realigned0_reduced0 -n 1574_80_TCGA-AO-A0JJ_HMS_CGCC_vs_633_by_method5_realigned0_reduced0 -c 4 -o 7X_1590_96_AO_AOJJ_HMS_noise_20 -w pyflow
+    - test/judge_result.py -i 7X_1590_96_AO_AOJJ_HMS_noise_20/infer.out.tsv -u 0.50491 -d 1.9745 --max_purity_delta 0.3 --max_ploidy_delta 1
+  artifacts:
+    when: always
+    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    expire_in: 12 mos
+    paths:
+    - 7X_1590_96_AO_AOJJ_HMS_noise_20/
+  dependencies:
+    - build_debug
+
+tcga3X_1125_431_AA_3968:
+  stage: test_1
+  script:
+    - echo "Test 1125_431_TCGA-AA-3968_HMS_CGCC_vs_1_by_method5_realigned0_reduced0";
+    - pwd
+    - test/test_tcga.py -f /y/Sunset/db/individual_alignment/ -t 1125_431_TCGA-AA-3968_HMS_CGCC_vs_1_by_method5_realigned0_reduced0 -n 1117_422_TCGA-AA-3968_HMS_CGCC_vs_1_by_method5_realigned0_reduced0 -c 4 -o 3X_1125_431__AA_3968_HMS -w pyflow
+    - test/judge_result.py -i 3X_1125_431__AA_3968_HMS/infer.out.tsv -u 0.55417 -d 2.1484 --max_purity_delta 0.1 --max_ploidy_delta 0.3
+  artifacts:
+    when: always
+    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    expire_in: 12 mos
+    paths:
+    - 3X_1125_431__AA_3968_HMS
+  dependencies:
+    - build_debug
+
+tcga3X_1125_431_AA_3968_divider_20:
+  stage: test_1
+  script:
+    - echo "Test noise divider 20 on 1125_431_TCGA-AA-3968_HMS_CGCC_vs_1_by_method5_realigned0_reduced0";
+    - pwd
+    - test/test_tcga.py -f /y/Sunset/db/individual_alignment/ --segment_stddev_divider 20 -t 1125_431_TCGA-AA-3968_HMS_CGCC_vs_1_by_method5_realigned0_reduced0 -n 1117_422_TCGA-AA-3968_HMS_CGCC_vs_1_by_method5_realigned0_reduced0 -c 4 -o 3X_1125_431_AA_3968_HMS_divider20 -w pyflow
+    - test/judge_result.py -i 3X_1125_431_AA_3968_HMS_divider20/infer.out.tsv -u 0.60518 -d 2.0896 --max_purity_delta 0.1 --max_ploidy_delta 0.3
+  artifacts:
+    when: always
+    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    expire_in: 12 mos
+    paths:
+    - 3X_1125_431_AA_3968_HMS_divider20
+  dependencies:
+    - build_debug
+
+singleclone_5x_0_1_noise_20:
+  stage: test_2
+  script:
+    - echo "singleclone_5x 0.1 reduce noise 20";
+    - pwd
+    - test/test_simulation.py -y singleclone_5x -p 0.1 -c 4 -o pyflow.log --segment_stddev_divider 20 --debug 1
+    - test/judge_simulation_result.sh singleclone_5x 1 0
+  artifacts:
+    when: always
+    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    expire_in: 12 mos
+    paths:
+    - singleclone_5x/purity.*/infer_result_debug
+    - singleclone_5x/result*.tsv
+  dependencies:
+    - build_debug
+
+singleclone_5x_0_5:
+  stage: test_1
+  script:
+    - echo "singleclone_5x 0.5";
+    - pwd
+    - test/test_simulation.py -y singleclone_5x -p 0.5 -c 4 -o pyflow --debug 1
+    - test/judge_simulation_result.sh singleclone_5x 1 1
+  artifacts:
+    when: always
+    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    expire_in: 12 mos
+    paths:
+    - singleclone_5x/purity.*/infer_result_debug
+    - singleclone_5x/result*.tsv
+  dependencies:
+    - build_debug
+
+singleclone_5x_0_5_noise_20:
+  stage: test_2
+  script:
+    - echo "singleclone_5x 0.5 reduce noise 20";
+    - pwd
+    - test/test_simulation.py -y singleclone_5x -p 0.5 -c 4 -o pyflow --segment_stddev_divider 20 --debug 1
+    - test/judge_simulation_result.sh singleclone_5x 1 1
+  artifacts:
+    when: always
+    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    expire_in: 12 mos
+    paths:
+    - singleclone_5x/purity.*/infer_result_debug
+    - singleclone_5x/result*.tsv
+  dependencies:
+    - build_debug
+
+
+singleclone_5x_0_9:
+  stage: test_2
+  script:
+    - echo "singleclone_5x 0.9";
+    - pwd
+    - test/test_simulation.py -y singleclone_5x -p 0.9 -c 4 -o pyflow --debug 1
+    - test/judge_simulation_result.sh singleclone_5x 1 1
+  artifacts:
+    when: always
+    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    expire_in: 12 mos
+    paths:
+    - singleclone_5x/purity.*/infer_result_debug
+    - singleclone_5x/result*.tsv
+  dependencies:
+    - build_debug
+
+singleclone_1percSNP_0_1:
+  stage: test_2
+  script:
+    - echo "singleclone_1_of_100snp 0.1";
+    - pwd
+    - test/test_simulation.py -y singleclone_1_of_100snp -p 0.1 -c 4 -o pyflow --debug 1
+    - test/judge_simulation_result.sh singleclone_1_of_100snp 1 0
+  artifacts:
+    when: always
+    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    expire_in: 12 mos
+    paths:
+    - singleclone_1_of_100snp/purity.*/infer_result_debug
+    - singleclone_1_of_100snp/result*.tsv
+  dependencies:
+    - build_debug
+
+singleclone_1percSNP_0_5:
+  stage: test_2
+  script:
+    - echo "singleclone_1_of_100snp 0.5";
+    - pwd
+    - test/test_simulation.py -y singleclone_1_of_100snp -p 0.5 -c 4 -o pyflow --debug 1
+    - test/judge_simulation_result.sh singleclone_1_of_100snp 1 1
+  artifacts:
+    when: always
+    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    expire_in: 12 mos
+    paths:
+    - singleclone_1_of_100snp/purity.*/infer_result_debug
+    - singleclone_1_of_100snp/result*.tsv
+  dependencies:
+    - build_debug
+
+singleclone_1percSNP_0_9:
+  stage: test_2
+  script:
+    - echo "singleclone_1_of_100snp 0.9";
+    - pwd
+    - test/test_simulation.py -y singleclone_1_of_100snp -p 0.9 -c 4 -o pyflow --debug 1
+    - test/judge_simulation_result.sh singleclone_1_of_100snp 1 1
+  artifacts:
+    when: always
+    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    expire_in: 12 mos
+    paths:
+    - singleclone_1_of_100snp/purity.*/infer_result_debug
+    - singleclone_1_of_100snp/result*.tsv
+  dependencies:
+    - build_debug
+
+
+subclone_2_0_1_noise_20:
+  stage: test_2
+  script:
+    - echo "subclone_2 0.1 reduce noise 20";
+    - pwd
+    - test/test_simulation.py -y subclone_2 -p 0.1 -c 4 -o pyflow --segment_stddev_divider 20 --debug 1
+    - test/judge_simulation_result.sh subclone_2 1 0
+  artifacts:
+    when: always
+    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    expire_in: 12 mos
+    paths:
+    - subclone_2/purity.*/infer_result_debug
+    - subclone_2/result*.tsv
+  dependencies:
+    - build_debug
+
+subclone_2_0_5_noise_20:
+  stage: test_2
+  script:
+    - echo "subclone_2 0.5 reduce noise 20";
+    - pwd
+    - test/test_simulation.py -y subclone_2 -p 0.5 -c 4 -o pyflow --segment_stddev_divider 20 --debug 1
+    - test/judge_simulation_result.sh subclone_2 1 1
+  artifacts:
+    when: always
+    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    expire_in: 12 mos
+    paths:
+    - subclone_2/purity.*/infer_result_debug
+    - subclone_2/result*.tsv
+  dependencies:
+    - build_debug
+
+subclone_2_0_5:
+  stage: test_2
+  script:
+    - echo "subclone_2 0.5";
+    - pwd
+    - test/test_simulation.py -y subclone_2 -p 0.5 -c 4 -o pyflow --debug 1
+    - test/judge_simulation_result.sh subclone_2 1 1
+  artifacts:
+    when: always
+    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    expire_in: 12 mos
+    paths:
+    - subclone_2/purity.*/infer_result_debug
+    - subclone_2/result*.tsv
+  dependencies:
+    - build_debug
+
+SNP_subclone_2_0_5:
+  stage: test_2
+  script:
+    - echo "subclone_2 0.5 call_snps 20 cores";
+    - pwd
+    - test/test_simulation.py -y subclone_2 -p 0.5 -c 20 --call_snps -o pyflow --debug 1
+    - test/judge_simulation_result.sh subclone_2 1 1
+  artifacts:
+    when: always
+    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    expire_in: 12 mos
+    paths:
+    - subclone_2/purity.*/infer_result_debug
+    - subclone_2/result*.tsv
+  dependencies:
+    - build_debug
+
+
+subclone_3_0_5:
+  stage: test_2
+  script:
+    - echo "subclone_3 0.5";
+    - pwd
+    - test/test_simulation.py -y subclone_3 -p 0.5 -c 4 -o pyflow --debug 1
+    - test/judge_simulation_result.sh subclone_3 1 1
+  artifacts:
+    when: always
+    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    expire_in: 12 mos
+    paths:
+    - subclone_3/purity.*/infer_result_debug
+    - subclone_3/result*.tsv
+  dependencies:
+    - build_debug
+
+#WGD_purity_0_7:
+#  stage: test_2
+#  script:
+#    - echo "WGD purity 0.7";
+#    - pwd
+#    - test/test_simulation.py -y WGD_purity0.7 -p 0.7 -c 4 -o pyflow --debug 1
+#    - test/judge_simulation_result.sh WGD_purity0.7
+#  artifacts:
+#    when: always
+#    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+#    expire_in: 12 mos
+#    paths:
+#    - WGD_purity0.7/purity.*/infer_result_debug
+#    - WGD_purity0.7/result*.tsv
+#  dependencies:
+#    - build_debug
+#
+#WGD_purity_divider_20:
+#  stage: test_2
+#  script:
+#    - echo "WGD purity 0.7 noise reduce 20";
+#    - pwd
+#    - test/test_simulation.py -y WGD_purity0.7 -p 0.7 -c 4 -o pyflow --segment_stddev_divider 20 --debug 1
+#    - test/judge_simulation_result.sh WGD_purity0.7
+#  artifacts:
+#    when: always
+#    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+#    expire_in: 12 mos
+#    paths:
+#    - WGD_purity0.7/purity.*/infer_result_debug
+#    - WGD_purity0.7/result*.tsv
+#  dependencies:
+#    - build_debug
+
+5M_single_mutant_0_7:
+  stage: test_1
+  script:
+    - echo "5M_single_mutant 0.7";
+    - pwd
+    - test/test_simulation.py -y 5M_single_mutant -p 0.7 -c 4 -o pyflow --debug 1
+    - test/judge_result.py -i 5M_single_mutant/purity.0.7/infer_result_debug/infer.out.tsv -u 0.7 -d 2.0 --max_purity_delta 0.1 --max_ploidy_delta 0.2
+  artifacts:
+    when: always
+    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    expire_in: 12 mos
+    paths:
+    - 5M_single_mutant/purity.*/infer_result_debug
+    - 5M_single_mutant/result*.tsv
+  dependencies:
+    - build_debug
+
+5M_single_mutant_0_7_release:
+  stage: test_1
+  script:
+    - echo "5M_single_mutant 0.7 release";
+    - pwd
+    - test/test_simulation.py -y 5M_single_mutant -p 0.7 -c 4 -o pyflow --debug 0
+    - test/judge_result.py -i 5M_single_mutant/purity.0.7/infer_result_debug/infer.out.tsv -u 0.7 -d 2.0 --max_purity_delta 0.1 --max_ploidy_delta 0.2
+  artifacts:
+    when: always
+    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    expire_in: 12 mos
+    paths:
+    - 5M_single_mutant/purity.*/infer_result_debug
+    - 5M_single_mutant/result*.tsv
+  dependencies:
+    - build_release
+
+#collect:
+#  stage: collect_result
+#  script:
+#    - echo "collect_result";
+#    - pwd
+#    - test/collect_result.sh
+#  artifacts:
+#    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+#    expire_in: 4 yrs
+#    paths:
+#    - run_result_png
+
+
+
+#job_clean:
+#  stage: cleanup
+#  script:
+#    - pwd
+#    - ls src_o
+#    - echo "clean"
+#  dependencies:
+#    - build_debug

@@ -1,0 +1,6 @@
+read_length	101
+window_size	500
+reference_folder_path	/mnt/refData
+samtools_path	/usr/local/bin/samtools
+caller_path	/usr/local/strelka
+binary_folder	/usr/local/Accucopy

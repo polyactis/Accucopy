@@ -1,0 +1,6 @@
+read_length	101
+window_size	500
+reference_folder_path	/y/hlab/AccurityTestData/hs38d1
+samtools_path	/y/program/bin/samtools
+caller_path	/y/program/strelka-2.9.10.centos6_x86_64
+binary_folder	/y/program/Sunset/src_o/

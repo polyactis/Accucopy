@@ -1,0 +1,2 @@
+CNA_length	haploid_length	ploidy
+843020000	2881033286	2.29261029509674
