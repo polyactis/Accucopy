@@ -14,7 +14,7 @@ The full-text of the license is included in the software package.
 
 To compile, go into src_o/ and type "make debug" or "make release".
 
-WARNING：Accucopy is not easy to compile. Check https://www.yfish.org/display/PUB/Accucopy#Accucopy-Compilesourcecode(foradvancedusers) for how to compile.
+WARNING：Accucopy is not easy to compile. Check https://www.yfish.org/display/PUB/Accucopy#Accucopy-3.5Compilesourcecode(foradvancedusers) for how to compile.
 
 If you just want to use Accucopy, please use its docker, https://www.yfish.org/display/PUB/Accucopy#Accucopy-Docker.
 
