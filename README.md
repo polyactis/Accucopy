@@ -4,7 +4,6 @@ Accucopy is a CNA-calling method that extends our previous Accurity model to pre
 
 The manuscript, titled "Accucopy: accurate and fast inference of allele-specific copy number alterations from low-coverage low-purity tumor sequencing data", is under review.
 
-
 # License
 
 The license follows our institute policy that you can use the program for free as long as you are using Accucopy strictly for non-profit research purposes. However, if you plan to use Accucopy for commercial purposes, a license is required and please contact yuhuang@simm.ac.cn or polyactis@gmail.com to obtain one.
@@ -15,6 +14,8 @@ The full-text of the license is included in the software package.
 
 To compile, go into src_o/ and type "make debug" or "make release".
 
-Accucopy is not easy to compile. If you just want to use Accucopy, please use its docker, https://www.yfish.org/display/PUB/Accucopy#Accucopy-Docker.
+WARNING：Accucopy is not easy to compile. Check https://www.yfish.org/display/PUB/Accucopy#Accucopy-Compilesourcecode(foradvancedusers) for how to compile.
 
-For more information, check https://www.yfish.org/display/PUB/Accucopy.
+If you just want to use Accucopy, please use its docker, https://www.yfish.org/display/PUB/Accucopy#Accucopy-Docker.
+
+You can also download the pre-compiled release. Check https://www.yfish.org/display/PUB/Accucopy for dependent packages to run Accucopy.
