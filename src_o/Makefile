@@ -33,6 +33,7 @@ debug: all ../src/main.rs
 	-mkdir -p ../target/debug/
 	cp ./main.py ./debug/main.py
 	chmod 755 ./debug/main.py
+	cargo update
 	cargo build
 	-git checkout -- ../src/main.rs
 	cp -r __init__.py ../LICENSE GADA ../target/debug/maestre configure infer plotCPandMCP.py plot_autocor_diff.py plot_model_select_result.py plot_coverage_after_normalization.py plot_tre.py plot_snp_maf_exp.py plot_snp_maf_peak.py debug/
@@ -44,6 +45,7 @@ release: all ../src/main.rs
 	-mkdir -p ../target/release/
 	cp ./main.py ./release/main.py
 	chmod 755 ./release/main.py
+	cargo update
 	cargo build --release
 	-git checkout -- ../src/main.rs
 	cp -r __init__.py ../LICENSE GADA ../target/release/maestre configure infer plotCPandMCP.py plot_autocor_diff.py plot_model_select_result.py plot_coverage_after_normalization.py plot_tre.py plot_snp_maf_exp.py plot_snp_maf_peak.py release/
