@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 from argparse import ArgumentParser
 import logging
@@ -15,7 +15,8 @@ class MainFlow(WorkflowRunner):
         normal_bam=None, output_dir=None,
         snp_output_dir=None,
         segment_stddev_divider=20, snp_coverage_min=2,
-        snp_coverage_var_vs_mean_ratio=10.0, clean=0, step=0, debug=0, auto=1,
+        snp_coverage_var_vs_mean_ratio=10.0, clean=False,
+        step=0, debug=False, auto=1,
         max_no_of_peaks_for_logL=3, nCores=4, **keywords):
         self.configure_filepath = configure_filepath
         self.tumor_bam = tumor_bam
@@ -35,6 +36,7 @@ class MainFlow(WorkflowRunner):
 
         if not os.path.isdir(self.output_dir):
             os.mkdir(self.output_dir)
+        #window_size will be read from the config file.
         self.samtools_path = ""
         self.strelka_path = ""
         self.read_len = None
@@ -43,7 +45,6 @@ class MainFlow(WorkflowRunner):
         self.binary_folder = None
 
         # normalization parameters
-        self.window_size = 500
         self.max_coverage = 300
         self.smooth_window_half_size = 2
 
@@ -143,7 +144,7 @@ class MainFlow(WorkflowRunner):
             os.remove(self.output_dir)
             os.mkdir(self.output_dir)
         elif os.path.isdir(self.output_dir):
-            if self.clean == 1:
+            if self.clean:
                 sys.stderr.write("Clean flag is on. Force remove %s and mkdir it.\n"%\
                     self.output_dir)
                 shutil.rmtree(self.output_dir)
@@ -201,7 +202,7 @@ class MainFlow(WorkflowRunner):
             oneThousandSNPFilepath = os.path.join(self.ref_folder_path, "snp_sites.gz")
             #input: tumor bam
             #output: self.vcf_tumor_file_path
-            cmd = "%s/bin/configureStrelkaGermlineWorkflow.py --bam %s "+\
+            cmd = "%s/bin/configureStrelkaGermlineWorkflow.py --bam %s "\
                 "--bam %s --ref %s --callRegions %s --runDir %s" % (
                 self.strelka_path, self.normal_bam, self.tumor_bam, 
                 os.path.join(self.ref_folder_path, "genome.fa"), 
@@ -273,7 +274,7 @@ class MainFlow(WorkflowRunner):
             cmd = "%s -i %s -o %s" % (
                 os.path.join(self.binary_folder, \
                     "plot_coverage_after_normalization.py"),
-                os.path.join(self.output_dir, "chr22.ratio.w500.csv.gz"),
+                os.path.join(self.output_dir, "chr22.ratio.w%s.csv.gz"%self.window_size),
                 os.path.join(self.output_dir, "plot.tumor_vs_normal.chr22.png"))
             plot_coverage_job = self.addTask("plot_tumor_normal_coverage", cmd,
                 dependencies=normalize_jobs)
@@ -297,12 +298,14 @@ class MainFlow(WorkflowRunner):
             self.startTimeList.append(datetime.now())
             status_string = "Last step time span: %s\n" % \
                 (self.startTimeList[-1] - self.startTimeList[-2])
-            status_string += "step 3: select heterozygous SNPs.\n\tStart time: %s\n" % \
+            status_string += "step 3: select heterozygous SNPs.\n\t"\
+                "Start time: %s\n" % \
                 self.startTimeList[-1]
             sys.stderr.write(status_string)
             #input: self.vcf_tumor_file_path, self.vcf_normal_file_path
             #output: het_snp
-            cmd = "%s select_het_snp -s %s -m 2 -x 200 --debug 0 -o %s 2>&1 | tee -a %s" % (
+            cmd = "%s select_het_snp -s %s -m 2 -x 200 --debug 0 -o %s 2>&1 "\
+                "| tee -a %s" % (
                 os.path.join(self.binary_folder, "maestre"),
                 self.two_sample_snp_file, self.het_snp_filepath,
                 self.infer_status_out_path)
@@ -339,13 +342,14 @@ class MainFlow(WorkflowRunner):
                     "%s.segments.M%s.T%s.tsv"%(chromosome, \
                         self.min_segment_len, self.t_score_threshold))
                 segment_out_ls.append(segment_out_path)
-                cmd = '%s --chromosome_id %s --window_size %s -M %s -T %s -i %s -o %s 2>&1 | tee -a %s' % \
-                      (os.path.join(self.binary_folder, "GADA"),
-                       chromosome, self.window_size, self.min_segment_len,
-                       self.t_score_threshold,
-                       normalize_output_file_ls[chr_index],
-                       segment_out_path,
-                       self.infer_status_out_path)
+                cmd = '%s --chromosome_id %s --window_size %s -M %s -T %s '\
+                    '-i %s -o %s 2>&1 | tee -a %s' % \
+                    (os.path.join(self.binary_folder, "GADA"),
+                    chromosome, self.window_size, self.min_segment_len,
+                    self.t_score_threshold,
+                    normalize_output_file_ls[chr_index],
+                    segment_out_path,
+                    self.infer_status_out_path)
                 segment_jobs.append(self.addTask("segment_%s"%chromosome, cmd, 
                     dependencies=normalize_jobs))
 
@@ -367,7 +371,8 @@ class MainFlow(WorkflowRunner):
             self.startTimeList.append(datetime.now())
             status_string = "Last step time span: %s\n" % \
                 (self.startTimeList[-1] - self.startTimeList[-2])
-            status_string += "step 5: Infer tumor purity and ploidy.\n\tstart time: %s\n" % \
+            status_string += "step 5: Infer tumor purity and ploidy.\n\t"\
+                "start time: %s\n" % \
                 self.startTimeList[-1]
             sys.stderr.write(status_string)
 
@@ -392,7 +397,8 @@ class MainFlow(WorkflowRunner):
                 dependencies=[reduce_all_segments_job, call_het_snps_tumor_job])
             if self.debug:
                 self.addTask("gzip_rc_ratio_no_of_windows_by_chr",
-                    "gzip %s/rc_ratio_no_of_windows_by_chr.tsv" % self.output_dir,
+                    "gzip %s/rc_ratio_no_of_windows_by_chr.tsv" % (
+                        self.output_dir),
                     dependencies=infer_job)
         else:
             infer_job = self.addTask("infer")
@@ -402,10 +408,10 @@ class MainFlow(WorkflowRunner):
         ############################################################
         if self.step <= 6:
             self.startTimeList.append(datetime.now())
-            status_string = "Last step time span: %s\n" % \
-                (self.startTimeList[-1] - self.startTimeList[-2])
-            status_string += "step 6: Make plots.\n\tstart time: %s\n" % \
-                self.startTimeList[-1]
+            status_string = "Last step time span: %s\n" % (
+                self.startTimeList[-1] - self.startTimeList[-2])
+            status_string += "step 6: Make plots.\n\tstart time: %s\n" % (
+                self.startTimeList[-1])
             sys.stderr.write(status_string)
             # input: $(output_dir)/infer.out.tsv, infer.out.details.tsv,
             #   rc_ratio_window_count_smoothed.tsv, peak_bounds.tsv
@@ -496,26 +502,27 @@ if __name__ == '__main__':
     ap.add_argument("--snp_output_dir", type=str, default=None,
         help="the directory to hold the SNP calling output. "
         "Default is the same folder as the bam file.")
-    ap.add_argument("--clean", default=0,
-        help="whether to remove the existing output folders and files?"
-        " 0 No, 1 Yes. Default is 0.")
+    ap.add_argument("--clean", action='store_true',
+        help="Toggle to remove the existing output folders and files.")
     ap.add_argument("--segment_stddev_divider", type=float, default=20.0,
         help="A factor that reduces the segment noise level. "
-        "The default value is recommended. Default is 20.")
+        "The default value (%(default)s) is recommended.")
     ap.add_argument("--snp_coverage_min", type=int, default=2,
         help="the minimum SNP coverage in adjusting the expected SNP MAF. "
-        "Default is 2.")
+        "Default is %(default)s.")
     ap.add_argument("--snp_coverage_var_vs_mean_ratio", type=float, default=10.0,
         help="Instead of using the observed SNP coverage variance (not consistent), "
         "use coverage_mean X this-parameter as the variance for "
         "the negative binomial model "
-        "which is used in adjusting the expected SNP MAF. Default is 10.")
+        "which is used in adjusting the expected SNP MAF. "
+        "Default is %(default)s.")
     ap.add_argument("--max_no_of_peaks_for_logL", type=int, default=3,
         help="the maximum number of peaks used in the log likelihood calculation. "
-        "The final logL is average over the number of peaks used. Default is 3")
+        "The final logL is average over the number of peaks used. "
+        "Default is %(default)s")
     ap.add_argument("--nCores", type=int, default=8, 
         help="the max number of CPUs to use in parallel. "
-            "Increase the number if you have many cores. Default is 8.")
+            "Increase the number if you have many cores. Default is %(default)s.")
     ap.add_argument("-s", "--step", type=int, default=0,
         help='0: start from the very beginning (Default). '\
         '1: obtain the read positions and the major allele fractions. '\
@@ -523,15 +530,15 @@ if __name__ == '__main__':
         '3: segmentation. '\
         '4: infer purity and ploidy only.')
     ap.add_argument("-l", "--lam", type=int, default=4,
-        help="lambda for the segmentation algorithm. Default is 4.")
+        help="lambda for the segmentation algorithm. Default is %(default)s.")
     ap.add_argument("-d", "--debug", type=int, default=0,
-        help="Set debug value. Default is 0, which means no debug output. \
-        Anything >0 leads to several intermediate plots in the output.")
+        help="Set debug value. Default 0 means no debug info output."
+            "Anything >0 enables more debug output.")
     ap.add_argument("--auto", type=int, default=1,
         help="The integer-valued argument that decides which method to use "
         "to detect the period in the read-count ratio histogram. "
         "0: the simple auto-correlation method. "
-        "1: a GADA-based algorithm (recommended). Default is 1.")
+        "1: a GADA-based algorithm (recommended). Default is %(default)s.")
     args = ap.parse_args()
     wflow = MainFlow(args.configure_filepath, args.tumor_bam, args.normal_bam,
         output_dir=args.output_dir,
