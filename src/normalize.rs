@@ -2,8 +2,9 @@
 use flate2;
 use flate2::Compression;
 use rust_htslib::bam;
-use rust_htslib::bam::Read as bamRead;
+use rust_htslib::bam::Read;
 use std::cmp;
+use std::str;
 use std::collections::HashMap;
 use std::io::prelude::*;
 use std::fs::File;
@@ -48,8 +49,7 @@ pub struct Normalize<'a> {
     tumor_file_path: &'a Path,
     normal_file_path: &'a Path,
     output_folder: &'a Path,
-    chr_len_array: Vec<usize>,
-    chr_name_array: Vec<String>,
+    chromosome_dict: HashMap<String, usize>,
     window_size: usize,
     //TODO expose max_fragment_len as an commandline argument.
     max_fragment_len: usize,
@@ -71,23 +71,28 @@ impl<'a> Normalize<'a> {
            smooth_window_half_size: usize,
            debug: i32,
     ) -> Normalize<'a> {
+        let selected_chromosome_name: Vec<String> = (1..=22).map(
+            | i | String::from("chr") + &i.to_string()).collect();
         let genome_dict_file: &Path = Path::new(genome_dict_path);
         let contents = fs::read_to_string(genome_dict_file).expect(format!(
             "Something went wrong read the file: {}",
             genome_dict_file.to_str().unwrap()).as_str());
-        let re = Regex::new(r"SN:(chr\d+)\tLN:(\d+)").unwrap();
-        let mut chr_len_vector: Vec<usize> = Vec::new();
-        let mut chr_name_vector: Vec<String> = Vec::new();
+        let re = Regex::new(r"SN:(?P<chr_name>chr\d+)\tLN:(?P<chr_len>\d+)").unwrap();
+        let mut chromosome_dict: HashMap<String, usize> = HashMap::new();
         for hit in re.captures_iter(contents.as_str()) {
-            chr_name_vector.push(hit[1].to_string());
-            chr_len_vector.push(hit[2].parse::<usize>().unwrap());
+            // only get data of autosome
+            let chr_name = hit["chr_name"].to_string();
+            if selected_chromosome_name.contains(&chr_name) {
+                chromosome_dict.insert(
+                    hit["chr_name"].to_string(),
+                    hit["chr_len"].parse::<usize>().unwrap());
+            }
         }
         Normalize {
             tumor_file_path: Path::new(tumor_file_path),
             normal_file_path: Path::new(normal_file_path),
             output_folder: Path::new(output_folder),
-            chr_len_array: chr_len_vector,
-            chr_name_array: chr_name_vector,
+            chromosome_dict: chromosome_dict,
             window_size,
             max_fragment_len: 1000,
             float_multiplier: 1000,
@@ -124,7 +129,7 @@ impl<'a> Normalize<'a> {
         println_stderr!("Reading in genome coverage from {:?} ... ", input_file_path);
         let mut chr_idx2one_chr_data: HashMap<usize, OneChrData> = HashMap::new();
         let mut bam_reader = bam::Reader::from_path(&input_file_path).unwrap();
-        //let header = bam::Header::from_template(bam.header());
+        let header = bam_reader.header().clone();
 
         let mut no_of_reads: usize = 0;
         let mut no_of_valid_fragments_chr: usize = 0;
@@ -140,11 +145,13 @@ impl<'a> Normalize<'a> {
         for r in bam_reader.records() {
             let record = r.unwrap();
             no_of_reads += 1;
-            if record.tid() >= self.chr_len_array.len() as i32 {
+            let chr_name = str::from_utf8(
+                header.tid2name(record.tid() as u32)).unwrap().to_string();
+            if !self.chromosome_dict.contains_key(&chr_name) {
                 //skip all remaining irrelevant chromosomes
                 break;
             }
-            current_chr_idx = record.tid();
+            current_chr_idx = chr_name.trim_start_matches("chr").parse::<i32>().unwrap() - 1;
 
             if current_chr_idx != prev_chr_idx {
                 no_of_unique_chrs += 1;
@@ -164,8 +171,8 @@ impl<'a> Normalize<'a> {
                 prev_chr_idx = current_chr_idx;
                 no_of_valid_fragments_chr = 0;
                 total_insert_len_of_chr = 0;
-                chr = self.chr_name_array[current_chr_idx as usize].clone();
-                chr_len = self.chr_len_array[current_chr_idx as usize];
+                chr = String::from("chr") + &(current_chr_idx + 1).to_string();
+                chr_len = self.chromosome_dict[&chr];
                 no_of_windows_in_this_chr = chr_len / self.window_size;
                 if chr_len % self.window_size != 0 {
                     no_of_windows_in_this_chr += 1;
@@ -181,7 +188,7 @@ impl<'a> Normalize<'a> {
             if record.mapq()<30 {
                 continue
             }
-            if record.is_paired() && ( record.insert_size()<0 || record.insert_size()>self.max_fragment_len as i32 ||
+            if record.is_paired() && ( record.insert_size()<0 || record.insert_size()>self.max_fragment_len as i64 ||
                 !record.is_proper_pair() || record.is_mate_unmapped() || !record.is_first_in_template() ||
                 record.is_secondary() || record.is_duplicate() || record.is_supplementary() ) {
                 continue;
@@ -236,7 +243,7 @@ impl<'a> Normalize<'a> {
         }
 
         // handle the last chromosome
-        if prev_chr_idx != -1 && prev_chr_idx < self.chr_len_array.len() as i32 {
+        if prev_chr_idx != -1 && self.chromosome_dict.contains_key(&chr) {
             let chr_idx: usize = prev_chr_idx as usize;
             let coverage_per_base = total_insert_len_of_chr as f32 / chr_len as f32;
             println_stderr!("{} reads so far for {:?}. Chromosome {} contains {} valid fragments.",
@@ -360,8 +367,7 @@ impl<'a> Normalize<'a> {
 
         let chr_idx2one_chr_data_normal = self.read_in_coverage_of_genome(self.normal_file_path);
         let coverage_mean_normal = self.calculate_genome_wide_cov_mean(&chr_idx2one_chr_data_normal);
-
-        for chr_idx in 0..self.chr_len_array.len() {
+        for chr_idx in 0..self.chromosome_dict.len() {
             self.output_coverage_ratio_of_one_chr(&chr_idx2one_chr_data_tumor[&chr_idx],
                                                   &chr_idx2one_chr_data_normal[&chr_idx],
                                                   &coverage_mean_tumor, &coverage_mean_normal);

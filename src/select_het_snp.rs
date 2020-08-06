@@ -3,6 +3,7 @@ extern crate time;
 use flate2;
 use flate2::Compression;
 use rust_htslib::bcf;
+use rust_htslib::bcf::Read;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::{Path};
@@ -74,7 +75,7 @@ impl<'a> SelectHetSNP<'a> {
                 sample2_allele_depth = allele_depth_vec[1].iter().map(|x| x.clone()).collect();
             }
             let chr = String::from_utf8_lossy(vcf_header.rid2name(
-                      record.rid().expect("Error read rid."))).to_string();
+                      record.rid().expect("Error read rid.")).unwrap()).to_string();
             let pos = record.pos() + 1; //convert 0 base to 1 base
             let normal_depth = sample1_allele_depth[0] + sample1_allele_depth[1];
             let tumor_depth = sample2_allele_depth[0] + sample2_allele_depth[1];
@@ -96,7 +97,7 @@ impl<'a> SelectHetSNP<'a> {
             }
             // Have passed all filters, it is a good heterogeneous SNP site
             let index: usize = snp_list.len();
-            snp_list.insert(index, Record{chr: chr.clone(), pos: pos,
+            snp_list.insert(index, Record{chr: chr.clone(), pos: pos as u32,
                             normal_ro: sample1_allele_depth[0], normal_ao: sample1_allele_depth[1],
                             normal_depth: normal_depth, tumor_ro: sample2_allele_depth[0],
                             tumor_ao: sample2_allele_depth[1], tumor_depth: tumor_depth});
