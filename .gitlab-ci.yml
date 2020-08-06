@@ -59,22 +59,6 @@ HCC1187_10X_0_1_noise_20:
   dependencies:
     - build_debug
 
-HCC1187_10X_0_3_noise_20:
-  stage: test_2
-  script:
-    - echo "Test HCC1187_10X_0.3_noise_20";
-    - pwd; ls
-    - test/test_tcga.py -f /y/hlab/AccurityTestData/HCC1187/mixed_sample/ --segment_stddev_divider 20 -t purity_0.3 -n normal_5X -c 4 -o HCC1187_10X_0_3_noise_20 -w pyflow
-    - test/judge_result.py -i HCC1187_10X_0_3_noise_20/infer.out.tsv -u 0.241 -d 2.7
-  artifacts:
-    when: always
-    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
-    expire_in: 12 mos
-    paths:
-    - HCC1187_10X_0_3_noise_20/
-  dependencies:
-    - build_debug
-
 HCC1187_10X_0_3_noise_10:
   stage: test_1
   script:
@@ -91,21 +75,6 @@ HCC1187_10X_0_3_noise_10:
   dependencies:
     - build_debug
 
-HCC1187_10X_0_4_noise_20:
-  stage: test_2
-  script:
-    - echo "Test HCC1187_10X_0.4_noise_20";
-    - pwd
-    - test/test_tcga.py -f /y/hlab/AccurityTestData/HCC1187/mixed_sample/ --segment_stddev_divider 20 -t purity_0.4 -n normal_5X -c 4 -o HCC1187_10X_0_4_noise_20 -w pyflow
-    - test/judge_result.py -i HCC1187_10X_0_4_noise_20/infer.out.tsv -u 0.331 -d 2.7
-  artifacts:
-    when: always
-    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
-    expire_in: 12 mos
-    paths:
-    - HCC1187_10X_0_4_noise_20/
-  dependencies:
-    - build_debug
 
 HCC1187_10X_0_4_noise_10:
   stage: test_1
