@@ -19,3 +19,8 @@ WARNING：Accucopy is not easy to compile. Check https://www.yfish.org/display/P
 If you just want to use Accucopy, please use its docker, https://www.yfish.org/display/PUB/Accucopy#Accucopy-Docker.
 
 You can also download the pre-compiled release. Check https://www.yfish.org/display/PUB/Accucopy for dependent packages to run Accucopy.
+
+# Reference genome
+We provide two different versions of human reference genomes, hs37d5 and hs38d1, downloadable from https://www.yfish.org/display/PUB/Accucopy#Accucopy-3.6Downloadareferencegenomefolder.
+
+We recommend users to re-align reads against one of our pre-packaged human genomes in order to minimize any unexpected errors. However, if your reference genome is not human or  slightly different (i.e. a different hs38 variant) from our pre-packaged ones (and you do not want to re-align), you can make a new reference genome folder by following instructions from https://www.yfish.org/display/PUB/Accucopy#Accucopy-3.7Makeyourownreferencegenomepackage.
