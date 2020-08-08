@@ -141,17 +141,33 @@ impl<'a> Normalize<'a> {
         let mut chr_len = 0usize;
         let mut no_of_windows_in_this_chr = 0usize;
         let mut no_of_unique_chrs = 0usize;
+        let mut target_name_map: HashMap<i32, (String, i32)> = HashMap::new();
 
+        // generate tid -> (chr_name, chr_idx) to save time
+        for name in header.target_names() {
+            let tid = header.tid(name).expect("unparsed name") as i32;
+            let chr_name = str::from_utf8(name).unwrap().to_string();
+            let mut chr_idx = -1i32;
+            if self.chromosome_dict.contains_key(&chr_name) {
+                chr_idx = chr_name.trim_start_matches("chr").parse::<i32>().unwrap() - 1;
+            }
+            target_name_map.insert(tid, (chr_name, chr_idx));
+        }
         for r in bam_reader.records() {
             let record = r.unwrap();
             no_of_reads += 1;
-            let chr_name = str::from_utf8(
-                header.tid2name(record.tid() as u32)).unwrap().to_string();
+            let tid = record.tid();
+            if tid == -1 {
+                // skip unmapped reads
+                continue;
+            }
+            let value = target_name_map[&tid].clone();
+            let chr_name = value.0;
+            current_chr_idx = value.1;
             if !self.chromosome_dict.contains_key(&chr_name) {
                 //skip all remaining irrelevant chromosomes
-                break;
+                continue;
             }
-            current_chr_idx = chr_name.trim_start_matches("chr").parse::<i32>().unwrap() - 1;
 
             if current_chr_idx != prev_chr_idx {
                 no_of_unique_chrs += 1;
