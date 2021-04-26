@@ -2071,10 +2071,9 @@ double Infer::output_copy_number_segments(OnePeriod &best_period_obj,
 int main(int argc, char **argv)
 {
     Infer infInstance(argv[1], argv[2], argv[3], argv[4],
-                      atof(argv[5]),
-                      atoi(argv[6]), atof(argv[7]),
-                      atoi(argv[8]),
-                      atoi(argv[9]), atoi(argv[10]),argv[11]);
+                      atoi(argv[5]), atof(argv[6]),
+                      atoi(argv[7]),
+                      atoi(argv[8]), atoi(argv[9]),argv[10]);
     int returnCode = infInstance.run();
     exit(returnCode);
 }
