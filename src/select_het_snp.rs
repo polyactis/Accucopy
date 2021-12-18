@@ -51,8 +51,8 @@ impl<'a> SelectHetSNP<'a> {
     }
 
     fn select_het_snp(&self){
-        let mut vcf = bcf::Reader::from_path(&self.snp_file).ok().expect("Error opening \
-                      snp file.");
+        let mut vcf = bcf::Reader::from_path(&self.snp_file).ok().expect(
+            "Error opening SNP file.");
         let mut snp_list: Vec<Record> = Vec::new();
         let vcf_header = vcf.header().clone();
         let mut snp_summary = SnpSummary{no_of_total_records:0, 
@@ -67,8 +67,8 @@ impl<'a> SelectHetSNP<'a> {
                 sample_1_genotype = format!("{}", genotypes.get(0));
                 _sample_2_genotype = format!("{}", genotypes.get(1));
             }
-            let mut sample1_allele_depth: Vec<i32>;
-            let mut sample2_allele_depth: Vec<i32>;
+            let sample1_allele_depth: Vec<i32>;
+            let sample2_allele_depth: Vec<i32>;
             {
                 let allele_depth_vec = record.format(b"AD").integer().unwrap();
                 sample1_allele_depth = allele_depth_vec[0].iter().map(|x| x.clone()).collect();
@@ -98,16 +98,17 @@ impl<'a> SelectHetSNP<'a> {
             // Have passed all filters, it is a good heterogeneous SNP site
             let index: usize = snp_list.len();
             snp_list.insert(index, Record{chr: chr.clone(), pos: pos as u32,
-                            normal_ro: sample1_allele_depth[0], normal_ao: sample1_allele_depth[1],
-                            normal_depth: normal_depth, tumor_ro: sample2_allele_depth[0],
-                            tumor_ao: sample2_allele_depth[1], tumor_depth: tumor_depth});
+                normal_ro: sample1_allele_depth[0],
+                normal_ao: sample1_allele_depth[1],
+                normal_depth: normal_depth, tumor_ro: sample2_allele_depth[0],
+                tumor_ao: sample2_allele_depth[1], tumor_depth: tumor_depth});
             // println!("{}:{} {:?}:{:?}, {:?}:{:?}",chr,pos,sample_1_genotype,sample_2_genotype,
             //           sample_1_AD,sample_2_AD);
         }
         println!("total SNP sites: {}\nGood heterogeneous SNP sites in normal: {}\n\
-                  Good heterogeneous SNP sites keeped: {}",
-                  snp_summary.no_of_total_records, snp_summary.no_of_good_hets_in_normal,
-                  snp_summary.no_of_good_hets);
+            Good heterogeneous SNP sites keeped: {}",
+            snp_summary.no_of_total_records, snp_summary.no_of_good_hets_in_normal,
+            snp_summary.no_of_good_hets);
         let output_f = File::create(&self.output_file_path)
             .expect(&format!("Error in creating output file {:?}", &self.output_file_path));
         let mut gz_writer = flate2::GzBuilder::new()
@@ -115,23 +116,28 @@ impl<'a> SelectHetSNP<'a> {
             .comment("Comment")
             .write(output_f, Compression::default());
         gz_writer.write_fmt(format_args!("#min_coverage={}, max_coverage={}\n",
-                                         self.min_coverage, self.max_coverage)).unwrap();
-        gz_writer.write_fmt(format_args!("#two sample snp file: {:?}\n", &self.snp_file)).unwrap();
-        gz_writer.write_fmt(format_args!("#no_of_total_records: {}\n", snp_summary.no_of_total_records)).unwrap();
-        gz_writer.write_fmt(format_args!("#no_of_good_hets in normal: {}\n", snp_summary.no_of_good_hets_in_normal)).unwrap();
-        gz_writer.write_fmt(format_args!("#no_of_good hets in two samples: {}\n", snp_summary.no_of_good_hets)).unwrap();
+            self.min_coverage, self.max_coverage)).unwrap();
+        gz_writer.write_fmt(format_args!("#two sample snp file: {:?}\n", 
+            &self.snp_file)).unwrap();
+        gz_writer.write_fmt(format_args!("#no_of_total_records: {}\n", 
+            snp_summary.no_of_total_records)).unwrap();
+        gz_writer.write_fmt(format_args!("#no_of_good_hets in normal: {}\n", 
+            snp_summary.no_of_good_hets_in_normal)).unwrap();
+        gz_writer.write_fmt(format_args!("#no_of_good hets in two samples: {}\n", 
+            snp_summary.no_of_good_hets)).unwrap();
         gz_writer.write_fmt(format_args!("chr\tpos\ttumor_depth\ttumor_ro\t\
                 tumor_ao\tnormal_depth\tnormal_ro\tnormal_ao\n")).unwrap();
 
         for snp_record in snp_list {
             gz_writer.write_fmt(format_args!("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
-                                             snp_record.chr, snp_record.pos, snp_record.tumor_depth,
-                                             snp_record.tumor_ro, snp_record.tumor_ao,
-                                             snp_record.normal_depth, snp_record.normal_ro,
-                                             snp_record.normal_ao)).unwrap();
+                snp_record.chr, snp_record.pos, snp_record.tumor_depth,
+                snp_record.tumor_ro, snp_record.tumor_ao,
+                snp_record.normal_depth, snp_record.normal_ro,
+                snp_record.normal_ao)).unwrap();
         }
         gz_writer.finish()
-            .expect(&format!("ERROR finish() failure for gz_writer of {:?}.", &self.output_file_path));
+            .expect(&format!("ERROR finish() failure for gz_writer of {:?}.", 
+                &self.output_file_path));
         println_stderr!("{} intersect SNPs.", snp_summary.no_of_good_hets);
     }
 

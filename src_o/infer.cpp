@@ -19,6 +19,7 @@ struct peak_greater_no_of_windows
 Infer::Infer(string configFilepath, string segment_data_input_path,
              string snp_data_input_path,
              string output_dir,
+             float segment_stddev_divider,
              int snp_coverage_min, float snp_coverage_var_vs_mean_ratio,
              int no_of_peaks_for_logL,
              int debug, int auto_, string refdictFilepath)
@@ -26,6 +27,7 @@ Infer::Infer(string configFilepath, string segment_data_input_path,
           _segment_data_input_path(segment_data_input_path),
           _snp_data_input_path(snp_data_input_path),
           _output_dir(output_dir),
+          _segment_stddev_divider(segment_stddev_divider),
           _snp_coverage_min(snp_coverage_min),
           _snp_coverage_var_vs_mean_ratio(snp_coverage_var_vs_mean_ratio),
           _no_of_peaks_for_logL(no_of_peaks_for_logL),
@@ -35,18 +37,24 @@ Infer::Infer(string configFilepath, string segment_data_input_path,
 {
     _periodObjVector.reserve(5);
     _snp_maf_stddev_divider = 20.0;
+    if (_segment_stddev_divider<=0){
+        cerr << fmt::format("ERROR: _segment_stddev_divider {} less than or equal to 0.\n",
+            _segment_stddev_divider);
+        exit(3);
+    }
     if (_snp_coverage_min<=0){
-        cerr << fmt::format("ERROR: _snp_coverage_min {} less than or equal to 0.\n", _snp_coverage_min);
+        cerr << fmt::format("ERROR: _snp_coverage_min {} less than or equal to 0.\n",
+            _snp_coverage_min);
         exit(3);
     }
     if (_snp_coverage_var_vs_mean_ratio<=0){
         cerr << fmt::format("ERROR: _snp_coverage_var_vs_mean_ratio {} less than or equal to 0.\n",
-                            _snp_coverage_var_vs_mean_ratio);
+            _snp_coverage_var_vs_mean_ratio);
         exit(3);
     }
     if (_no_of_peaks_for_logL<=0){
         cerr << fmt::format("ERROR: _no_of_peaks_for_logL {} less than or equal to 0.\n",
-                            _no_of_peaks_for_logL);
+            _no_of_peaks_for_logL);
         exit(3);
     }
 
@@ -58,6 +66,7 @@ Infer::Infer(string configFilepath, string segment_data_input_path,
     _total_no_of_snps_used = 0;
     _total_no_of_segments = 0;
     _total_no_of_segments_used = 0;
+    _max_peak_half_width = -1;
 
     _period_discover_run_type = 1;
     _genome_len_cnv_all = 0;
@@ -100,6 +109,7 @@ Infer::Infer(string configFilepath, string segment_data_input_path,
                        "no_of_snps_of_one_rc_peak" << "\t" <<
                        "currentPeriodObj.no_of_maf_peaks" << endl;
     }
+    cerr <<"_segment_stddev_divider=" << _segment_stddev_divider << endl;
     cerr <<"_snp_maf_stddev_divider=" << _snp_maf_stddev_divider << endl;
     cerr <<"_snp_covearge_min=" << _snp_coverage_min << endl;
     cerr <<"_snp_coverage_var_vs_mean_ratio=" << _snp_coverage_var_vs_mean_ratio << endl;
@@ -149,13 +159,15 @@ int Infer::run()
         double autocor_shift_diff[kPeriodMax];
         calc_autocor_shift_diff(autocor_shift_diff, left_x, right_x);
         _period_discover_run_type = 1;
-        candidate_period_vec = infer_candidate_period_by_GADA(autocor_shift_diff, left_x, right_x,
-                                                              _period_discover_run_type);
+        candidate_period_vec = infer_candidate_period_by_GADA(autocor_shift_diff,
+            left_x, right_x,
+            _period_discover_run_type);
         /*
         if (candidate_period_vec.empty()){
             _period_discover_run_type = 2;
-            candidate_period_vec = infer_candidate_period_by_GADA(autocor_shift_diff, left_x, right_x,
-                                                                  _period_discover_run_type);
+            candidate_period_vec = infer_candidate_period_by_GADA(
+                autocor_shift_diff, left_x, right_x,
+                _period_discover_run_type);
         }
         */
     } else {
@@ -189,13 +201,14 @@ int Infer::run()
 
     if (_period_obj_from_logL.logL>0 && _period_obj_from_logL.best_purity>0) {
 
-        _period_obj_from_logL.ploidy_corrected = output_copy_number_segments(_period_obj_from_logL,
-                                                                             _period_obj_from_logL.peak_obj_vector);
+        _period_obj_from_logL.ploidy_corrected = output_copy_number_segments(
+            _period_obj_from_logL, _period_obj_from_logL.peak_obj_vector);
         //recalibrate_Q_and_purity_based_on_cnv_ploidy(_period_obj_from_logL);
 
         if (_period_obj_from_logL.best_purity>0 &&
             _period_obj_from_logL.best_purity<=1 &&
-            _period_obj_from_logL.ploidy_corrected>=MIN_PLOIDY && _period_obj_from_logL.ploidy_corrected<=MAX_PLOIDY) {
+            _period_obj_from_logL.ploidy_corrected>=MIN_PLOIDY && 
+            _period_obj_from_logL.ploidy_corrected<=MAX_PLOIDY) {
             output_logL(_period_obj_from_logL, _periodObjVector);
         } else {
             cerr << fmt::format("ERROR: best_purity {} not in (0,1] or ploidy_corrected {} not in [{}, {}].\n",
@@ -378,7 +391,8 @@ void Infer::calc_autocor_shift_diff(double* all_diff, double &left_x, double &ri
     gada_input_file.close();
     cerr << "Done.\n";
 }
-vector<OnePeriod> Infer:: infer_candidate_period_by_GADA(double* all_diff, double left_x, double right_x, int run_type)
+vector<OnePeriod> Infer:: infer_candidate_period_by_GADA(double* all_diff,
+    double left_x, double right_x, int run_type)
 {
     //run_type 1: require positive and negative slope distinction + normal distribution threshold
     //run_type 2: only normal distribution threshold
@@ -415,7 +429,8 @@ vector<OnePeriod> Infer:: infer_candidate_period_by_GADA(double* all_diff, doubl
         input_array[i] = _cor_array_shift_one_vec[i];
     }
 
-    double sigma2=-1;  //variance observed, if negative value, it will be estimated by the mean of the differences
+    double sigma2=-1;  //variance observed, if negative value,
+    // it will be estimated by the mean of the differences
     // I would recommend to be estimated on all the chromosomes and as a trimmed mean
     double BaseAmp=0.0;
     double a=0.5; //SBL hyper prior parameter
@@ -488,7 +503,8 @@ vector<OnePeriod> Infer:: infer_candidate_period_by_GADA(double* all_diff, doubl
                     }
                 }
             } else {
-                candidate_period_int = (period_int_vec[baseGADA.Iext[i + 1] - 1] + period_int_vec[baseGADA.Iext[i + 1]])/2;
+                candidate_period_int = (period_int_vec[baseGADA.Iext[i + 1] - 1] +
+                    period_int_vec[baseGADA.Iext[i + 1]])/2;
             }
             //lowe_bound and upper_bound are same. no more refining. THIS is the period.
             if (candidate_period_int>0 && candidate_period_int<=max_period_int) {
@@ -670,7 +686,7 @@ int Infer::infer_candidate_period_by_autocor(OnePeriod &period_obj)
 OnePeak Infer::find_first_peak_ab_init(int candidate_period_int)
 {
     OnePeak first_peak_obj = find_first_peak_given_bounds(
-            candidate_period_int, kFirstPeakMin, kFirstPeakMax + kPeakHalfWidthMax);
+            candidate_period_int, kFirstPeakMin, kFirstPeakMax + candidate_period_int/4);
     cerr << " Find_first_peak_ab_init() for period: " << candidate_period_int << endl
          << "  first peak: " << first_peak_obj.peak_center_int << endl;
     cerr << "  lower bound: " << first_peak_obj.lower_bound_int << endl;
@@ -684,12 +700,11 @@ OnePeak Infer::find_first_peak_given_bounds(int candidate_period_int,
 {
     /***
     The best start position for a given candidate_period_int.
-  use the sum_of_window_count_at_periodic_peaks to choose the best first peak.
+    Use the sum_of_window_count_at_periodic_peaks to choose the best first peak.
 
     It can correspond to regions with no peaks
     ***/
-    if (_debug > 0)
-    {
+    if (_debug > 0) {
         cerr << "Finding first peak, period_int: "
              << candidate_period_int << ", within bounds of ("
              << first_peak_lower_bound_int << "-" << first_peak_upper_bound_int
@@ -697,19 +712,21 @@ OnePeak Infer::find_first_peak_given_bounds(int candidate_period_int,
     }
     OnePeak first_peak_obj = OnePeak();
     double max_sum = -1;
-    double all_sum[kFirstPeakMax + kPeakHalfWidthMax] = {0};  // add on 12-22,
-    // change the
-    // RESOLUTION
-    int peak_width_assumed = candidate_period_int/4;
+    double all_sum[kFirstPeakMax + kPeakHalfWidthMax] = {0};
+    // max peak half width <= 1/4 of of smallest period
+    if (_max_peak_half_width==-1){
+        _max_peak_half_width = candidate_period_int/4;
+        
+    }
+    int half_width_assumed = _max_peak_half_width;
+
     for (int first_peak_int = first_peak_lower_bound_int;
-         first_peak_int <= first_peak_upper_bound_int; first_peak_int++)
-    {
+         first_peak_int <= first_peak_upper_bound_int; first_peak_int++) {
         if (_ratio_int_pdf_vec[first_peak_int] < kPeakHeightMin)
             continue;
         all_sum[first_peak_int] += _ratio_int_pdf_vec[first_peak_int];
-        // plus its neighbors
-        for (int j = 1; j <= peak_width_assumed; j++)
-        {
+        for (int j = 1; j <= half_width_assumed; j++) {
+            // add all density within the 1st peak.
             all_sum[first_peak_int] +=
                     _ratio_int_pdf_vec[first_peak_int - j] / (j * j);
             all_sum[first_peak_int] +=
@@ -717,12 +734,12 @@ OnePeak Infer::find_first_peak_given_bounds(int candidate_period_int,
         }
 
         for (int a_peak_int = first_peak_int + candidate_period_int;
-             a_peak_int < _ratio_int_pdf_vec.size() - peak_width_assumed;
-             a_peak_int += candidate_period_int)
-        {
+             a_peak_int < _ratio_int_pdf_vec.size() - half_width_assumed;
+             a_peak_int += candidate_period_int) {
+            // accumulate all density from periodic peaks
             all_sum[first_peak_int] += _ratio_int_pdf_vec[a_peak_int];
-            for (int j = 1; j <= peak_width_assumed; j++)
-            {
+            for (int j = 1; j <= half_width_assumed; j++) {
+                // add all density within this peak.
                 // cerr<<"all_sum "<<all_sum[first_peak_int]<<"
                 // "<<a_peak_int<<endl;
                 all_sum[first_peak_int] +=
@@ -731,8 +748,7 @@ OnePeak Infer::find_first_peak_given_bounds(int candidate_period_int,
                         _ratio_int_pdf_vec[a_peak_int + j] / (j * j);
             }
         }
-        if (all_sum[first_peak_int] > max_sum)
-        {
+        if (all_sum[first_peak_int] > max_sum) {
             max_sum = all_sum[first_peak_int];
             first_peak_obj.peak_center_int = first_peak_int;
         }
@@ -742,27 +758,26 @@ OnePeak Infer::find_first_peak_given_bounds(int candidate_period_int,
     // get lower and upper bound
     int best_first_peak = first_peak_obj.peak_center_int;
     int candidate_peak_half_width = 1;
-    for (; candidate_peak_half_width <= kPeakHalfWidthMax &&
-           best_first_peak - candidate_peak_half_width >= kFirstPeakMin &&
-           best_first_peak + candidate_peak_half_width <=
-           kFirstPeakMax + kPeakHalfWidthMax;
-           candidate_peak_half_width++)
-    {
-        if (all_sum[best_first_peak - candidate_peak_half_width] +
-            all_sum[best_first_peak + candidate_peak_half_width] <
+    int peak_left = best_first_peak - candidate_peak_half_width;
+    int peak_right = best_first_peak + candidate_peak_half_width;
+    for (; candidate_peak_half_width <= half_width_assumed &&
+           peak_left >= kFirstPeakMin &&
+           peak_right <= kFirstPeakMax + half_width_assumed;
+           candidate_peak_half_width++) {
+        if (all_sum[peak_left] +
+            all_sum[peak_right] <
             2 * DEV2 * all_sum[best_first_peak])
             break;
+        peak_left--;
+        peak_right++;
     }
-    //set maximum peak width to 1/2 of period.
-    candidate_peak_half_width = min(candidate_peak_half_width, peak_width_assumed);
 
     first_peak_obj.half_width_int = candidate_peak_half_width;
     first_peak_obj.lower_bound_int =
             max(0, first_peak_obj.peak_center_int - candidate_peak_half_width);
     first_peak_obj.upper_bound_int =
             first_peak_obj.peak_center_int + candidate_peak_half_width;
-    if (_debug > 0)
-    {
+    if (_debug > 0) {
         cerr << "  best_first_peak center: " << best_first_peak << endl
              << "  sum of window count at all periodic peaks: "
              << all_sum[best_first_peak] << endl
@@ -797,24 +812,23 @@ vector<OnePeak> Infer::find_peaks(OnePeriod &period_obj,
     int first_peak_center_int = first_peak_obj.peak_center_int;
     for (int i = 0;
          first_peak_center_int + period_int*i <= MAX_RATIO_HIGH_RES; i++) {
-        //initial peak center and no_of_periods_since_1st_peak
+        //calculate the peak center and no_of_periods_since_1st_peak
         int peak_center_int = first_peak_center_int + period_int*i;
         int lower_bound_int = max(peak_center_int - half_width_int, 0);
         int upper_bound_int = min(peak_center_int + half_width_int, MAX_RATIO_HIGH_RES);
 
         OnePeak peak_obj =
-                OnePeak(peak_center_int, i, lower_bound_int, upper_bound_int, half_width_int);
+                OnePeak(peak_center_int, _ratio_int_pdf_vec[peak_center_int], i, 
+                    lower_bound_int, upper_bound_int, half_width_int);
         peak_obj.ResetCounters();
         peak_obj.no_of_periods_since_1st_peak = i;
 
         vector<int> peak_rc_ratio_vector;
         for (int rc_ratio_int = lower_bound_int; rc_ratio_int <= upper_bound_int;
              rc_ratio_int++) {
-            // newly add on June 3 2012 to plot snp mafs
             peak_rc_ratio_vector.push_back(rc_ratio_int);
         }
-        //refine peak center
-        //TODO refine peak half_width_int
+        //refine the peak center and the peak half_width_int
         refine_peak_center(peak_obj, peak_rc_ratio_vector, period_int, first_peak_center_int);
         peak_obj_vector.push_back(peak_obj);
     }
@@ -851,11 +865,10 @@ int Infer::output_peak_bounds(vector<OnePeak> &peak_obj_vector)
     peak_bounds_outf << "lowerBound\tupperBound\n";
     vector<OnePeak>::iterator it = peak_obj_vector.begin();
     int counter = 0;
-    for (; it != peak_obj_vector.end(); it++)
-    {
+    for (; it != peak_obj_vector.end(); it++) {
         counter++;
         peak_bounds_outf << fmt::format("{}\t{}\n", it->lower_bound_int / FRESOLUTION,
-                                        it->upper_bound_int / FRESOLUTION);
+                it->upper_bound_int / FRESOLUTION);
     }
     /*
     // cerr<<"no_of_snps_in_peak "<<no_of_snps_in_peak<<"\n";
@@ -883,18 +896,15 @@ OnePeriod Infer::infer_best_period_by_logL(vector<OnePeriod> &candidate_period_v
     OnePeriod best_period_obj = OnePeriod();
     for (int candidate_period_index=0;
          candidate_period_index<candidate_period_vec.size();
-         candidate_period_index++)
-    {
+         candidate_period_index++) {
         OnePeriod &candidate_period = candidate_period_vec[candidate_period_index];
         int candidate_period_int = candidate_period.period_int;
 
         string status_msg = fmt::format("### candidate period_int: {}\n", candidate_period_int);
         cerr << status_msg;
         _infer_details_outf << status_msg;
+        // find the first peak, ab init
         candidate_period.first_peak_obj = find_first_peak_ab_init(candidate_period_int);
-        candidate_period.first_peak_int = candidate_period.first_peak_obj.peak_center_int;
-        candidate_period.width = candidate_period.first_peak_obj.half_width_int;
-        // find the first peak
         // peak must in a auto correlation field and
         // first peak < 1000
         //  _num_peak_less_one_half = (_one_half -_first_peak_obj.peak_center_int + 1) /
@@ -902,29 +912,40 @@ OnePeriod Infer::infer_best_period_by_logL(vector<OnePeriod> &candidate_period_v
 
         //candidate_period.first_peak_obj =
         //    refine_first_peak(candidate_period_int, first_peak_obj_prior);
-        int first_peak_int = candidate_period.first_peak_obj.peak_center_int;
         candidate_period.peak_obj_vector = find_peaks(
-                candidate_period, candidate_period.first_peak_obj);
+            candidate_period, candidate_period.first_peak_obj);
+        // first_peak_obj is refined in find_peaks().
+        candidate_period.first_peak_obj = candidate_period.peak_obj_vector[0];
+        candidate_period.first_peak_int = candidate_period.first_peak_obj.peak_center_int;
+        // half_width_int is refined in find_peaks().
+        candidate_period.width = candidate_period.first_peak_obj.half_width_int;
+        int first_peak_int = candidate_period.first_peak_obj.peak_center_int;
+
+        // sort peak_obj by desc order
+        sort(candidate_period.peak_obj_vector.begin(), candidate_period.peak_obj_vector.end(),
+             [](const OnePeak &a, const OnePeak &b) -> bool {
+                 return a.peak_height > b.peak_height; });
 
         // for each period, sum likelihood of all peaks (segments and snps)
         candidate_period.ResetCounters();
         double sum_adj_logL = 0;
-        if (_debug > 0)
-        {
+        if (_debug > 0) {
             _rc_logL_outf << "period_int" << "\t"
                           << candidate_period_int << "\t"
                           << "half-width" << "\t"
                           << candidate_period.period_int - candidate_period.lower_bound_int << endl;
             _rc_logL_outf << "peak_index" << "\t" << "peak_center_float" << "\t"
+                          << "peak_height" << "\t"
+                          << "peak_half_width" << "\t"
                           << "logL_peak" << "\t" << "candidate_period.logL"
                           << endl;
         }
         //set no_of_peaks_for_logL for this period
-        candidate_period.no_of_peaks_for_logL = min(_no_of_peaks_for_logL, int(candidate_period.peak_obj_vector.size()));
+        candidate_period.no_of_peaks_for_logL = min(_no_of_peaks_for_logL, \
+            int(candidate_period.peak_obj_vector.size()));
         for (unsigned int peak_index = 0;
              peak_index < candidate_period.no_of_peaks_for_logL;
-             peak_index++)
-        {
+             peak_index++) {
             OnePeak &peak_obj =
                     candidate_period.peak_obj_vector[peak_index];
             float peak_center_float = peak_obj.peak_center_int * 1.0 / RESOLUTION;
@@ -933,9 +954,10 @@ OnePeriod Infer::infer_best_period_by_logL(vector<OnePeriod> &candidate_period_v
                     peak_center_float, peak_obj, candidate_period, adj_logL);
             candidate_period.logL += logL_peak;
             sum_adj_logL += adj_logL;
-            if (_debug > 0)
-            {
+            if (_debug > 0) {
                 _rc_logL_outf << peak_index << "\t" << peak_center_float << "\t"
+                              << peak_obj.peak_height << "\t"
+                              << peak_obj.half_width_int << "\t"
                               << logL_peak << "\t"
                               << candidate_period.logL << endl;
             }
@@ -953,13 +975,12 @@ OnePeriod Infer::infer_best_period_by_logL(vector<OnePeriod> &candidate_period_v
                 -log(sqrt(sum_adj_logL / candidate_period.no_of_windows) /
                      candidate_period_int *
                      FRESOLUTION);
-        //-0.5*log(candidate_period.no_of_segments)/candidate_period.no_of_segments-0.5*log(candidate_period.no_of_segments)*(50*1000-first_peak_int)/period_int/candidate_period.no_of_segments;
+        //-0.5*log(candidate_period.no_of_segments)/candidate_period.no_of_segments-0.5*
+        //  log(candidate_period.no_of_segments)*(50*1000-first_peak_int)/period_int/candidate_period.no_of_segments;
 
         this->infer_no_of_copy_nos_bf_1st_peak_for_one_period_by_logL_snp(candidate_period);
 
         candidate_period.logL += candidate_period.best_logL_snp;
-        //20171229 take average
-        candidate_period.logL = candidate_period.logL/candidate_period.no_of_peaks_for_logL;
         if (_debug>0) {
             cerr << fmt::format(" best_logL_snp: {}\n", candidate_period.best_logL_snp);
             cerr << fmt::format(" no_of_peaks_for_logL: {}\n", candidate_period.no_of_peaks_for_logL);
@@ -979,8 +1000,10 @@ OnePeriod Infer::infer_best_period_by_logL(vector<OnePeriod> &candidate_period_v
          << "  best_ploidy: " << best_period_obj.best_ploidy << endl
          << "  Q: " << best_period_obj.rc_ratio_int_of_cp_2 << endl
          << "  logL: " << best_period_obj.logL << endl
-         << "  best_no_of_copy_nos_bf_1st_peak: " << best_period_obj.best_no_of_copy_nos_bf_1st_peak << endl
-         << "  first_peak_int: " << best_period_obj.first_peak_int << endl;
+         << "  best_no_of_copy_nos_bf_1st_peak: "
+         << best_period_obj.best_no_of_copy_nos_bf_1st_peak << endl
+         << "  first_peak_center: " << _first_peak_obj.peak_center_int << endl
+         << "  first_peak_half_width: " << _first_peak_obj.half_width_int << endl;
     return best_period_obj;
 }
 
@@ -995,6 +1018,7 @@ int Infer::output_logL(OnePeriod &best_period_obj,
                 << "ploidy" << "\t"
                 << "ploidy_naive" << "\t"
                 << "rc_ratio_of_cp_2" << "\t"
+                << "segment_stddev_divider" << "\t"
                 << "snp_maf_stddev_divider" << "\t"
                 << "snp_coverage_min" << "\t"
                 << "snp_coverage_var_vs_mean_ratio" << "\t"
@@ -1006,6 +1030,7 @@ int Infer::output_logL(OnePeriod &best_period_obj,
                 << best_period_obj.ploidy_corrected << "\t"
                 << best_period_obj.best_ploidy << "\t"
                 << best_period_obj.rc_ratio_int_of_cp_2 << "\t"
+                << _segment_stddev_divider << "\t"
                 << _snp_maf_stddev_divider << "\t"
                 << _snp_coverage_min << "\t"
                 << _snp_coverage_var_vs_mean_ratio << "\t"
@@ -1030,8 +1055,7 @@ int Infer::output_logL(OnePeriod &best_period_obj,
                 << _total_no_of_snps << "\t"
                 << _total_no_of_snps_used
                 << endl;
-    if (_debug > 0)
-    {
+    if (_debug > 0) {
         // output all candidate snp likelihoods of the best period object
         _infer_details_outf << "best_period_int" << "\t" << "logL" << "\t" <<
                             "index.logL_snp_vector" << "\t" <<
@@ -1042,8 +1066,7 @@ int Infer::output_logL(OnePeriod &best_period_obj,
                             "snp_penalty_vector[i]" << "\t" <<
                             "snp_no_of_parameters_vector[i]" << endl;
         for (unsigned int i = 0; i < best_period_obj.logL_snp_vector.size();
-             i++)
-        {
+             i++) {
             _infer_details_outf << best_period_int << "\t"
                                 << best_period_logL << "\t"
                                 << i << "\t"
@@ -1068,8 +1091,7 @@ int Infer::output_logL(OnePeriod &best_period_obj,
                             << "best_purity" << "\t"
                             << "best_ploidy" << endl;
         vector<OnePeriod>::iterator it = period_obj_vector.begin();
-        for (; it != period_obj_vector.end(); it++)
-        {
+        for (; it != period_obj_vector.end(); it++) {
             OnePeriod period_obj = *it;
             _infer_details_outf
                     << period_obj.period_int << "\t"
@@ -1128,8 +1150,8 @@ double Infer::infer_no_of_copy_nos_bf_1st_peak_for_one_period_by_logL_snp(
 
     if (_debug>0) {
         cerr << fmt::format("  Tallest peak index={}, peak_center_int={}, no_of_windows={}.\n",
-                            tallest_peak.peak_index, tallest_peak.peak_center_int,
-                            tallest_peak.no_of_windows);
+            tallest_peak.peak_index, tallest_peak.peak_center_int,
+            tallest_peak.no_of_windows);
 
     }
     if (tallest_peak.peak_index>2){
@@ -1144,8 +1166,8 @@ double Infer::infer_no_of_copy_nos_bf_1st_peak_for_one_period_by_logL_snp(
     sort(peak_obj_vector.begin(), peak_obj_vector.end());
     if (_debug>0) {
         cerr << fmt::format("  First peak's peak_index={}, peak_center_int={}, no_of_windows={}.\n",
-                            peak_obj_vector[0].peak_index, peak_obj_vector[0].peak_center_int,
-                            peak_obj_vector[0].no_of_windows);
+            peak_obj_vector[0].peak_index, peak_obj_vector[0].peak_center_int,
+            peak_obj_vector[0].no_of_windows);
     }
     //allow 20% period deficit in no_of_cps_bf_1st_peak
     int max_no_of_copy_nos_bf_1st_peak = int(floor(double(first_peak_int) / double(period_int) +0.2));
@@ -1165,8 +1187,7 @@ double Infer::infer_no_of_copy_nos_bf_1st_peak_for_one_period_by_logL_snp(
     int cp_no_two_rc_ratio_int = -1;
     for (int no_of_copy_nos_bf_1st_peak = no_of_copy_nos_bf_1st_peak_prior;
          no_of_copy_nos_bf_1st_peak <= max_no_of_copy_nos_bf_1st_peak;
-         no_of_copy_nos_bf_1st_peak++)
-    {
+         no_of_copy_nos_bf_1st_peak++) {
         int cp_no_two_peak_index = 2 - no_of_copy_nos_bf_1st_peak;
         if (cp_no_two_peak_index>=0 && cp_no_two_peak_index<peak_obj_vector.size()){
             cp_no_two_rc_ratio_int = peak_obj_vector[cp_no_two_peak_index].peak_center_int;
@@ -1194,8 +1215,7 @@ double Infer::infer_no_of_copy_nos_bf_1st_peak_for_one_period_by_logL_snp(
         candidate_period.ResetSNPCounters();
         // calculate the expected MAF for a SNP at any major allele copy number
         for (unsigned int peak_index = 0; peak_index < candidate_period.no_of_peaks_for_logL;
-             peak_index++)
-        {
+             peak_index++) {
             double logL_of_one_logOR_peak = 0;
             OnePeak &peak_obj = peak_obj_vector[peak_index];
             int cp = no_of_copy_nos_bf_1st_peak + peak_index;
@@ -1207,17 +1227,18 @@ double Infer::infer_no_of_copy_nos_bf_1st_peak_for_one_period_by_logL_snp(
                     peak_obj_vector[peak_index].segment_obj_vector.begin();
             for (; one_segment_iterator !=
                    peak_obj_vector[peak_index].segment_obj_vector.end();
-                   one_segment_iterator++)
-            {
+                   one_segment_iterator++) {
                 oneSegmentSNPs = one_segment_iterator->oneSegmentSNPs;
                 if (oneSegmentSNPs.no_of_snps <= 5)
                     continue;
                 //if all logOR in the segments is the same value, skip.
-                double mean = std::accumulate(oneSegmentSNPs.logOR_list.begin(),oneSegmentSNPs.logOR_list.end(),0.0)*1.0/oneSegmentSNPs.logOR_list.size();
-                double var = std::accumulate(oneSegmentSNPs.logOR_list.begin(), oneSegmentSNPs.logOR_list.end(), 0.0,
-                            [&mean](double x, double y){return x+std::pow(y-mean, 2);})/oneSegmentSNPs.logOR_list.size();
+                double mean = std::accumulate(oneSegmentSNPs.logOR_list.begin(),
+                    oneSegmentSNPs.logOR_list.end(),0.0)*1.0/oneSegmentSNPs.logOR_list.size();
+                double var = std::accumulate(oneSegmentSNPs.logOR_list.begin(), 
+                    oneSegmentSNPs.logOR_list.end(), 0.0, [&mean](double x, double y)
+                    {return x+std::pow(y-mean, 2);})/oneSegmentSNPs.logOR_list.size();
                 if(var <= 0) {
-                    cerr << "For segments: chr" << one_segment_iterator->chr_index << ": "
+                    cerr << "For segments: chr" << one_segment_iterator->chr_index + 1<< ": "
                          << one_segment_iterator->start_pos << "-"
                          << one_segment_iterator->end_pos << ". The varance is "
                          << var << " , not greater than 0. "
@@ -1232,8 +1253,7 @@ double Infer::infer_no_of_copy_nos_bf_1st_peak_for_one_period_by_logL_snp(
                 logL_snp += model_selection.result.best_logL;
                 logL_of_one_logOR_peak += model_selection.result.best_logL;
             }
-            if (_debug)
-            {
+            if (_debug) {
                 _snp_logL_outf << period_int << "\t"
                                 << no_of_copy_nos_bf_1st_peak << "\t"
                                 << peak_index << "\t"
@@ -1268,8 +1288,7 @@ double Infer::infer_no_of_copy_nos_bf_1st_peak_for_one_period_by_logL_snp(
         candidate_period.snp_no_of_parameters_vector.push_back(
                 candidate_period.no_of_logOR_peaks);
 
-        if (logL_snp > candidate_period.best_logL_snp)
-        {
+        if (logL_snp > candidate_period.best_logL_snp) {
             // TODO use logL_snp or lod_snp?
             candidate_period.best_logL_snp = logL_snp;
             candidate_period.best_no_of_copy_nos_bf_1st_peak =
@@ -1295,12 +1314,10 @@ double Infer::calc_one_peak_logL_rc(float peak_center_float, OnePeak &peak_obj,
     //double rc_ratio_var_per_rc_peak = 0;
     double std_t;
     double ssum_diff = 0.0;
-    for (uint i = 0; i < peak_obj.segment_rc_ratio_vector.size(); i++)
-    {
+    for (uint i = 0; i < peak_obj.segment_rc_ratio_vector.size(); i++) {
         int ratio_int = peak_obj.segment_rc_ratio_vector[i];
         vector<OneSegment>::iterator it = _rc_ratio_segments[ratio_int].begin();
-        for (; it != _rc_ratio_segments[ratio_int].end(); it++)
-        {
+        for (; it != _rc_ratio_segments[ratio_int].end(); it++) {
             OneSegment oneSegment = *it;
             float rc_ratio = oneSegment.rc_ratio;
             double stddev = oneSegment.stddev;
@@ -1370,8 +1387,7 @@ int Infer::getSNPDataFromFile(string input_file_path)
     int noOfLines = 0;
 
     std::getline(input_stream, line);
-    while (!line.empty())
-    {
+    while (!line.empty()) {
         noOfLines++;
         std::vector<std::string> element_vec = string_split(line, "\t");
         chr_string = element_vec[0];
@@ -1434,16 +1450,14 @@ int Infer::getSegmentDataFromFile(string input_file_path)
 
     int **noOfWindowsByRatioAndChr;
     noOfWindowsByRatioAndChr = new int *[MAX_RATIO_HIGH_RES + 1];
-    for (int i = 0; i <= MAX_RATIO_HIGH_RES; i++)
-    {
+    for (int i = 0; i <= MAX_RATIO_HIGH_RES; i++) {
         noOfWindowsByRatioAndChr[i] = new int[ref_dict_info.NUM_AUTO_CHR];
         for (int chr_index = 0; chr_index < ref_dict_info.NUM_AUTO_CHR; chr_index++)
             noOfWindowsByRatioAndChr[i][chr_index] = 0;
     }
     int noOfLines = 0;
     std::getline(input_stream, line);
-    while (!line.empty())
-    {
+    while (!line.empty()) {
         noOfLines++;
         std::vector<std::string> element_vec = string_split(line, "\t");
 
@@ -1459,12 +1473,13 @@ int Infer::getSegmentDataFromFile(string input_file_path)
         end = stoi(element_vec[2]);
         read_count_ratio = stof(element_vec[3]);
         //decrease coverage ratio stddev to enhance signal/noise ratio
-        ratio_stddev = stof(element_vec[4]);
+        ratio_stddev = stof(element_vec[4])/_segment_stddev_divider;
         no_of_valid_windows = stoi(element_vec[5]);
 
-        if (_total_no_of_segments % 10000 == 0) cerr << _total_no_of_segments << "\n";
-        if (read_count_ratio > 0.1 && ratio_stddev > read_count_ratio)
-        {
+        if (_total_no_of_segments % 10000 == 0) {
+            cerr << _total_no_of_segments << "\n";
+        }
+        if (read_count_ratio > 0.1 && ratio_stddev > read_count_ratio) {
             //TODO why?
             cerr << "Warning: Too much variation at " << chr_string << start << end
                  << ". Skip! " << read_count_ratio << " " << ratio_stddev << " "
@@ -1473,37 +1488,35 @@ int Infer::getSegmentDataFromFile(string input_file_path)
         }
 
         int ratio_high_res = int(read_count_ratio * RESOLUTION);
-        if (read_count_ratio <= MAX_RATIO_RANGE && ratio_stddev > 1e-12)
-        {
+        if (read_count_ratio <= MAX_RATIO_RANGE && ratio_stddev > 1e-12) {
             int chr_index = chrStr_to_index(chr_string);
             if (chr_index == -1) continue;
             OneSegment oneSegment =
                     OneSegment(chr_index, start, end, read_count_ratio, ratio_stddev,
                                no_of_valid_windows);
             // SNP info
-            if (read_count_ratio <= MAX_RATIO)
-            {
+            if (read_count_ratio <= MAX_RATIO) {
                 noOfWindowsByRatioAndChr[ratio_high_res][chr_index] +=
                         no_of_valid_windows;
                 findSNPsWithinSegment(oneSegment);
-                kernel_smoothing(read_count_ratio * RESOLUTION, ratio_stddev*RESOLUTION, no_of_valid_windows,
-                                 _ratio_int_pdf_vec);
+                kernel_smoothing(read_count_ratio * RESOLUTION,
+                    ratio_stddev*RESOLUTION, no_of_valid_windows,
+                    _ratio_int_pdf_vec);
             }
             _rc_ratio_segments[ratio_high_res].push_back(oneSegment);
             _total_no_of_segments_used ++;
         }
     }
     input_file.close();
-    if (_debug > 0)
-    {
+    if (_debug > 0) {
         output_segment_ratio(noOfWindowsByRatioAndChr);
     }
-    for (int i = 0; i <= MAX_RATIO_HIGH_RES; i++)
-    {
+    for (int i = 0; i <= MAX_RATIO_HIGH_RES; i++) {
         delete[] noOfWindowsByRatioAndChr[i];
     }
     delete[] noOfWindowsByRatioAndChr;
-    cerr << _total_no_of_segments << " segments. " << _total_no_of_segments_used << " segments used. " << _total_no_of_snps_used << " SNPs used." << endl;
+    cerr << _total_no_of_segments << " segments. " << _total_no_of_segments_used
+        << " segments used. " << _total_no_of_snps_used << " SNPs used." << endl;
     return 0;
 }
 
@@ -1538,8 +1551,7 @@ int Infer::output_segment_ratio(int **noOfWindowsByRatioAndChr)
         rc_ratio_by_chr_out_file << "\t" << setw(8) << "chr" << chr_index << "_noOfWindows";
     rc_ratio_by_chr_out_file << "\n";
 
-    for (int i = 0; i <= MAX_RATIO_HIGH_RES; i++)
-    {
+    for (int i = 0; i <= MAX_RATIO_HIGH_RES; i++) {
         rc_ratio_by_chr_out_file << setw(8) << i;
         for (int chr_index = 0; chr_index < ref_dict_info.NUM_AUTO_CHR; chr_index++)
             rc_ratio_by_chr_out_file << "\t" << setw(8)
@@ -1704,8 +1716,8 @@ int Infer::findSNPsWithinSegment(OneSegment &oneSegment)
 // the kernal bandwidth is determined by the standard deviation of the read
 // counts of each segment.
 void Infer::kernel_smoothing(double mean_value, double stddev,
-                             int sample_size,
-                             vector<double> &vec_to_hold_data) {
+                            int sample_size,
+                            vector<double> &vec_to_hold_data) {
     int i_start = max(double(0), floor((mean_value - 2 * stddev)));
     int i_end = min(ceil(mean_value + 2 * stddev), double(vec_to_hold_data.size()-1));
     for (int i = i_start; i <= i_end; i++) {
@@ -1738,6 +1750,23 @@ int Infer::refine_peak_center(OnePeak &peak_obj, vector<int> segment_rc_ratio_ve
         mean_rc_ratio_of_one_peak /= cnt;
 
         peak_obj.peak_center_int = mean_rc_ratio_of_one_peak*RESOLUTION;
+        peak_obj.peak_height = _ratio_int_pdf_vec[peak_obj.peak_center_int];
+        // Refine the peak width
+        int candidate_peak_half_width = 1;
+        int peak_left = peak_obj.peak_center_int - candidate_peak_half_width;
+        int peak_right = peak_obj.peak_center_int + candidate_peak_half_width;
+        for (; candidate_peak_half_width <= _max_peak_half_width &&
+            peak_left >= kFirstPeakMin &&
+            peak_right <= _ratio_int_pdf_vec.size();
+            candidate_peak_half_width++) {
+            if (_ratio_int_pdf_vec[peak_left] +
+                _ratio_int_pdf_vec[peak_right] <
+                2 * DEV2 * peak_obj.peak_height)
+                break;
+            peak_left--;
+            peak_right++;
+        }
+        peak_obj.half_width_int = candidate_peak_half_width;
         peak_obj.lower_bound_int = max(peak_obj.peak_center_int - peak_obj.half_width_int, 0);
         peak_obj.upper_bound_int = min(peak_obj.peak_center_int + peak_obj.half_width_int,
                                        MAX_RATIO_HIGH_RES);
@@ -1751,6 +1780,7 @@ int Infer::refine_peak_center(OnePeak &peak_obj, vector<int> segment_rc_ratio_ve
     }
     // cerr << "no_of_periods_since_1st_peak " << no_of_periods_since_1st_peak
     // << endl;
+    
     return peak_obj.no_of_periods_since_1st_peak;
 }
 
@@ -1761,8 +1791,7 @@ vector<double> Infer::call_subclone_peaks(double *a, int size)
     // int should_size = 3;
     int clip_size = 5;
     // double con=1/sqrt(2*3.14159)/10;
-    for (int i = clip_size; i < size - clip_size; i++)
-    {
+    for (int i = clip_size; i < size - clip_size; i++) {
         double mean1, std1, mean2, std2, mean3, std3, mean4, std4;
         // double mn=0;
         // for(int j=i-clip_size;j<=i+clip_size;j++) mn+=(a[j]/(2*clip_size+1));
@@ -1780,8 +1809,7 @@ vector<double> Infer::call_subclone_peaks(double *a, int size)
             ((mean2 - mean1) / std1 + (mean3 - mean2) / std2 +
              (mean4 - mean3) / std3 + (a[i] - mean4) / std4 >
              3) &&
-            (a[i] - mean1) / std1 > 5 && 1)
-        {
+            (a[i] - mean1) / std1 > 5 && 1) {
             peaks.push_back(i - size + 1);
             peaks.push_back(a[i]);
             peaks.push_back((a[i] - mean4) / std4);
@@ -1796,11 +1824,12 @@ vector<double> Infer::call_subclone_peaks(double *a, int size)
 }
 
 double Infer::output_copy_number_segments(OnePeriod &best_period_obj,
-                                          vector<OnePeak> &peak_obj_vector)
+    vector<OnePeak> &peak_obj_vector)
 {
     // segmentations with copy number assignment
     string output_file_path = _output_dir + "/cnv.output.tsv";
-    //cnv.interval.tsv is only for sub-clonal peaks. In addition to copy number, it contains copy interval info.
+    // cnv.interval.tsv is only for sub-clonal peaks.//
+    // In addition to copy number, it contains copy interval info.
     string output_cp_interval = _output_dir + "/cnv.interval.tsv";
 
     cerr << "Outputting copy number to  " << output_file_path << endl;
@@ -1813,8 +1842,7 @@ double Infer::output_copy_number_segments(OnePeriod &best_period_obj,
 
     OnePeak first_peak_obj = best_period_obj.first_peak_obj;
     bool is_ratio_looked[MAX_RATIO_RANGE_HIGH_RES + 1];
-    for (int i = 0; i <= MAX_RATIO_RANGE_HIGH_RES; i++)
-    {
+    for (int i = 0; i <= MAX_RATIO_RANGE_HIGH_RES; i++) {
         is_ratio_looked[i] = false;
     }
     // string
@@ -1830,8 +1858,7 @@ double Infer::output_copy_number_segments(OnePeriod &best_period_obj,
          << "cumu_end"
          << endl;
     ofstream out_interval(output_cp_interval.c_str());
-    if (_debug > 0)
-    {
+    if (_debug > 0) {
         out_interval << "chr\t"
                      << "start\t"
                      << "end\t"
@@ -1856,8 +1883,7 @@ double Infer::output_copy_number_segments(OnePeriod &best_period_obj,
 
     double CHR_ACU[ref_dict_info.NUM_AUTO_CHR + 1];
     CHR_ACU[0] = 0;
-    for (int i = 0; i < ref_dict_info.NUM_AUTO_CHR; i++)
-    {
+    for (int i = 0; i < ref_dict_info.NUM_AUTO_CHR; i++) {
         CHR_ACU[i + 1] = (CHR_ACU[i] + ref_dict_info.CHR_SIZE[i]);
     }
 
@@ -1865,15 +1891,13 @@ double Infer::output_copy_number_segments(OnePeriod &best_period_obj,
     OneSegmentSNPs oneSegmentSNPs;
     string model_selection_h5 = _output_dir + "/model_selection_log/model_selection.h5";
     HDF5_Log model_selection_log(model_selection_h5);
-    for (int peak_index = 0; peak_index < no_of_peaks; peak_index++)
-    {
+    for (int peak_index = 0; peak_index < no_of_peaks; peak_index++) {
         OnePeak &peak_obj = peak_obj_vector[peak_index];
         int cp = no_of_copy_nos_bf_1st_peak + peak_index;
         if (_debug > 0) cerr << "\tcopy number: " << cp << endl;
         vector<int>::iterator it;
         for (it = peak_obj.segment_rc_ratio_vector.begin();
-             it < peak_obj.segment_rc_ratio_vector.end(); it++)
-        {
+             it < peak_obj.segment_rc_ratio_vector.end(); it++) {
             is_ratio_looked[*it] = true;
         }
         if (peak_obj.no_of_snps <= 0) 
@@ -1884,8 +1908,7 @@ double Infer::output_copy_number_segments(OnePeriod &best_period_obj,
         vector<OneSegment>::iterator one_segment_iterator =
                 peak_obj.segment_obj_vector.begin();
         for (; one_segment_iterator != peak_obj.segment_obj_vector.end();
-               one_segment_iterator++)
-        {
+               one_segment_iterator++) {
             oneSegmentSNPs = one_segment_iterator->oneSegmentSNPs;
             OneSegment oneSegment = *one_segment_iterator;
             int start = oneSegment.start_pos;
@@ -1900,9 +1923,11 @@ double Infer::output_copy_number_segments(OnePeriod &best_period_obj,
             if (oneSegmentSNPs.no_of_snps <= 0)
                 continue;
             //if all logOR in the segments is the same value, skip.
-            double mean = std::accumulate(oneSegmentSNPs.logOR_list.begin(),oneSegmentSNPs.logOR_list.end(),0.0)*1.0/oneSegmentSNPs.logOR_list.size();
-            double var = std::accumulate(oneSegmentSNPs.logOR_list.begin(), oneSegmentSNPs.logOR_list.end(), 0.0,
-                            [&mean](double x, double y){return x+std::pow(y-mean, 2);})/oneSegmentSNPs.logOR_list.size();
+            double mean = std::accumulate(oneSegmentSNPs.logOR_list.begin(), 
+                oneSegmentSNPs.logOR_list.end(),0.0)*1.0/oneSegmentSNPs.logOR_list.size();
+            double var = std::accumulate(oneSegmentSNPs.logOR_list.begin(),
+                oneSegmentSNPs.logOR_list.end(), 0.0, [&mean](double x, double y)
+                    {return x+std::pow(y-mean, 2);})/oneSegmentSNPs.logOR_list.size();
             if(var <= 0) {
                 cerr << "For segments: chr" << one_segment_iterator->chr_index << ": "
                      << one_segment_iterator->start_pos << "-"
@@ -1914,11 +1939,13 @@ double Infer::output_copy_number_segments(OnePeriod &best_period_obj,
             string logout = _output_dir + "/model_selection_log/" 
                             + fmt::format("chr{}_{}_{}", chr_integer, start, end);
             ofstream model_selection_output(logout.c_str());
-            Model_Selection model_selection(oneSegmentSNPs.logOR_list, cp, best_period_obj.best_purity,
-                                            oneSegmentSNPs.coverage, model_selection_output);
+            Model_Selection model_selection(oneSegmentSNPs.logOR_list,
+                cp, best_period_obj.best_purity,
+                oneSegmentSNPs.coverage, model_selection_output);
             model_selection.run();
             string segment_name = fmt::format("chr{}_{}_{}", chr_integer, start, end);
-            model_selection_log.write(segment_name, oneSegmentSNPs.logOR_list, model_selection.result);
+            model_selection_log.write(segment_name, oneSegmentSNPs.logOR_list,
+                model_selection.result);
             float cp_float = (oneSegment.get_rc_ratio_high_res() -
                               first_peak_obj.peak_center_int) *
                              1.0 / best_period_int +
@@ -1938,18 +1965,17 @@ double Infer::output_copy_number_segments(OnePeriod &best_period_obj,
         }  // each segment
     }      // each rc peak
     // subclonal regions. float copy number
-    // 20171213 not sure of segment_stddev_multiplier, maybe because segment MAD was reduced in segmentation.
+    // 20171213 not sure of segment_stddev_multiplier,
+    //  maybe because segment MAD was reduced in segmentation.
     cerr << "For subclone regions" << endl;
-    for (int ratio_int = 0; ratio_int <= MAX_RATIO_RANGE_HIGH_RES; ratio_int++)
-    {
+    for (int ratio_int = 0; ratio_int <= MAX_RATIO_RANGE_HIGH_RES; ratio_int++) {
         if (is_ratio_looked[ratio_int])
             continue;
         else
             is_ratio_looked[ratio_int] = true;
 
         int no_of_segments = _rc_ratio_segments[ratio_int].size();
-        for (int k = 0; k < no_of_segments; k++)
-        {
+        for (int k = 0; k < no_of_segments; k++) {
             OneSegment oneSegment = _rc_ratio_segments[ratio_int][k];
             int start = oneSegment.start_pos;
             int end = oneSegment.end_pos;
@@ -1963,13 +1989,14 @@ double Infer::output_copy_number_segments(OnePeriod &best_period_obj,
             cp_number_multi_len += segment_length*cp_float;
 
             double cp_stddev = (purity * ploidy + 2 * (1 - purity)) *
-                               oneSegment.stddev / purity;
+                               (oneSegment.stddev * _segment_stddev_divider) / purity;
             double interval_left = cp_float - cp_stddev;
             double interval_right = cp_float + cp_stddev;
             int interval_left_int = (int)interval_left;
             int interval_right_int = (int)interval_right;
-            if (interval_right_int - interval_left_int != 1)  // covers no integer or more than one integer
-            {
+            int cp = int(cp_float) + (cp_float - int(cp_float) > 0.5 ? 1 : 0);
+            if (abs(cp - cp_float) > 0.1) {
+                // covers no integer or more than one integer
                 outf << chr_integer << "\t"
                      << start << "\t"
                      << end << "\t"
@@ -1978,29 +2005,29 @@ double Infer::output_copy_number_segments(OnePeriod &best_period_obj,
                      << cp_float << "\t"
                      << (long)(start + CHR_ACU[chr_integer - 1]) << "\t" 
                      << (long)(end + CHR_ACU[chr_integer - 1]) NewLineMACRO;
-                if (_debug > 0)
-                {
+                if (_debug > 0) {
                     out_interval << chr_integer << "\t"
-                                 << start << "\t"
-                                 << end << "\t"
-                                 << cp_float << "\t"
-                                 << cp_float << "\t"
-                                 << cp_stddev << "\t"
-                                 << interval_left << "\t"
-                                 << interval_right << "\t"
-                                 << oneSegment.stddev << "\t"
-                                 << oneSegment.no_of_windows NewLineMACRO;
+                        << start << "\t"
+                        << end << "\t"
+                        << cp_float << "\t"
+                        << cp_float << "\t"
+                        << cp_stddev << "\t"
+                        << interval_left << "\t"
+                        << interval_right << "\t"
+                        << oneSegment.stddev * _segment_stddev_divider << "\t"
+                        << oneSegment.no_of_windows NewLineMACRO;
                 }
             }
-            else  // covers one integer
-            {
+            else {
+                // covers one integer
                 int cp =
                         int(cp_float) + (cp_float - int(cp_float) > 0.5 ? 1 : 0);
                 oneSegmentSNPs = oneSegment.oneSegmentSNPs;
                 if (oneSegmentSNPs.no_of_snps <= 0) {
                     cerr << "Warning: For segment chr" << chr_integer << ": "
-                         << start << "-" << end << ". The no_of_snps, " << oneSegmentSNPs.no_of_snps << ", <=0. "
-                         << "So skip calculate for that segment." << endl;
+                        << start << "-" << end << ". The no_of_snps, "
+                        << oneSegmentSNPs.no_of_snps << ", <=0. "
+                        << "So skip calculate for that segment." << endl;
                     continue;
                 }
                 if (cp < 0) {
@@ -2010,9 +2037,11 @@ double Infer::output_copy_number_segments(OnePeriod &best_period_obj,
                     continue;
                 }
                 //if all logOR in the segments is the same value, skip.
-                double mean = std::accumulate(oneSegmentSNPs.logOR_list.begin(),oneSegmentSNPs.logOR_list.end(),0.0)*1.0/oneSegmentSNPs.logOR_list.size();
-                double var = std::accumulate(oneSegmentSNPs.logOR_list.begin(), oneSegmentSNPs.logOR_list.end(), 0.0,
-                                [&mean](double x, double y){return x+std::pow(y-mean, 2);})/oneSegmentSNPs.logOR_list.size();
+                double mean = std::accumulate(oneSegmentSNPs.logOR_list.begin(),
+                    oneSegmentSNPs.logOR_list.end(),0.0)*1.0/oneSegmentSNPs.logOR_list.size();
+                double var = std::accumulate(oneSegmentSNPs.logOR_list.begin(),
+                    oneSegmentSNPs.logOR_list.end(), 0.0, [&mean](double x, double y)
+                        {return x+std::pow(y-mean, 2);})/oneSegmentSNPs.logOR_list.size();
                 if(var <= 0) {
                     cerr << "For segments: chr" << chr_integer << ": "
                          << start << "-"
@@ -2024,13 +2053,15 @@ double Infer::output_copy_number_segments(OnePeriod &best_period_obj,
                 string logout = _output_dir + "/model_selection_log/" 
                                 + fmt::format("chr{}_{}_{}", chr_integer, start, end);
                 ofstream model_selection_output(logout.c_str());
-                Model_Selection model_selection(oneSegmentSNPs.logOR_list, cp, best_period_obj.best_purity,
-                                                oneSegmentSNPs.coverage, model_selection_output);
+                Model_Selection model_selection(oneSegmentSNPs.logOR_list, cp,
+                    best_period_obj.best_purity,
+                    oneSegmentSNPs.coverage, model_selection_output);
                 model_selection.run();
                 string segment_name = fmt::format("chr{}_{}_{}", chr_integer, start, end);
-                model_selection_log.write(segment_name, oneSegmentSNPs.logOR_list, model_selection.result);
+                model_selection_log.write(segment_name, oneSegmentSNPs.logOR_list,
+                    model_selection.result);
                 int major_allele_cp = max(model_selection.result.selection.first,
-                                      model_selection.result.selection.second);
+                    model_selection.result.selection.second);
 
                 outf << chr_integer << "\t"
                      << start << "\t"
@@ -2040,18 +2071,17 @@ double Infer::output_copy_number_segments(OnePeriod &best_period_obj,
                      << cp_float << "\t"
                      << (long)(start + CHR_ACU[chr_integer - 1]) << "\t" 
                      << (long)(end + CHR_ACU[chr_integer - 1]) NewLineMACRO;
-                if (_debug > 0)
-                {
+                if (_debug > 0) {
                     out_interval << chr_integer << "\t"
-                                 << start << "\t"
-                                 << end << "\t"
-                                 << cp << "\t"
-                                 << cp_float << "\t"
-                                 << cp_stddev << "\t"
-                                 << interval_left << "\t"
-                                 << interval_right << "\t"
-                                 << oneSegment.stddev << "\t"
-                                 << oneSegment.no_of_windows NewLineMACRO;
+                        << start << "\t"
+                        << end << "\t"
+                        << cp << "\t"
+                        << cp_float << "\t"
+                        << cp_stddev << "\t"
+                        << interval_left << "\t"
+                        << interval_right << "\t"
+                        << oneSegment.stddev*_segment_stddev_divider<< "\t"
+                        << oneSegment.no_of_windows NewLineMACRO;
                 }
             }
         }
@@ -2064,16 +2094,18 @@ double Infer::output_copy_number_segments(OnePeriod &best_period_obj,
     outf << "#ploidy_clonal=" << _ploidy_clonal << endl;
     outf.close();
     out_interval.close();
-    cerr << "CNV output done. ploidy_cnv_all=" << _ploidy_cnv_all << " ploidy_clonal=" << _ploidy_clonal << "\n";
+    cerr << "CNV output done. ploidy_cnv_all=" << _ploidy_cnv_all
+        << " ploidy_clonal=" << _ploidy_clonal << "\n";
     return _ploidy_cnv_all;
 }
 
 int main(int argc, char **argv)
 {
     Infer infInstance(argv[1], argv[2], argv[3], argv[4],
-                      atoi(argv[5]), atof(argv[6]),
-                      atoi(argv[7]),
-                      atoi(argv[8]), atoi(argv[9]),argv[10]);
+                      atof(argv[5]),
+                      atoi(argv[6]), atof(argv[7]),
+                      atoi(argv[8]),
+                      atoi(argv[9]), atoi(argv[10]),argv[11]);
     int returnCode = infInstance.run();
     exit(returnCode);
 }

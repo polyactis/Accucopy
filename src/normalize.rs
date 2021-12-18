@@ -68,14 +68,15 @@ impl<'a> Normalize<'a> {
            genome_dict_path: &'a str,
            window_size: usize,
            max_coverage: usize,
+           no_of_autosomes: usize,
            smooth_window_half_size: usize,
            debug: i32,
     ) -> Normalize<'a> {
-        let selected_chromosome_name: Vec<String> = (1..=22).map(
+        let selected_chromosome_name: Vec<String> = (1..=no_of_autosomes).map(
             | i | String::from("chr") + &i.to_string()).collect();
         let genome_dict_file: &Path = Path::new(genome_dict_path);
         let contents = fs::read_to_string(genome_dict_file).expect(format!(
-            "Something went wrong read the file: {}",
+            "Something went wrong in reading {}",
             genome_dict_file.to_str().unwrap()).as_str());
         let re = Regex::new(r"SN:(?P<chr_name>chr\d+)\tLN:(?P<chr_len>\d+)").unwrap();
         let mut chromosome_dict: HashMap<String, usize> = HashMap::new();
@@ -88,6 +89,8 @@ impl<'a> Normalize<'a> {
                     hit["chr_len"].parse::<usize>().unwrap());
             }
         }
+        println_stderr!("Found {} chromsomes in {:?}.",
+            chromosome_dict.len(), genome_dict_path);
         Normalize {
             tumor_file_path: Path::new(tumor_file_path),
             normal_file_path: Path::new(normal_file_path),
@@ -103,15 +106,15 @@ impl<'a> Normalize<'a> {
     }
 
     fn smooth_coverage_of_one_chr(&'a self, chr: String, chr_len: usize,
-                                  no_of_fragments: usize, coverage_per_base: f32,
-                                  coverage_per_window: &Vec<usize>) -> OneChrData {
+            no_of_fragments: usize, coverage_per_base: f32,
+            coverage_per_window: &Vec<usize>) -> OneChrData {
         // calculate gc_ratio_per_base per coverage/fragment in each window
         let mut coverage_per_window_tmp = coverage_per_window.to_vec();
         let no_of_windows: usize = coverage_per_window.len();
         for window_index in 0..no_of_windows {
             //smooth over neighboring windows.
             let smooth_left_index = cmp::max(0 as i32,
-                                             window_index as i32 - self.smooth_window_half_size as i32) as usize;
+                window_index as i32 - self.smooth_window_half_size as i32) as usize;
             let smooth_right_stop = cmp::min(no_of_windows, window_index+self.smooth_window_half_size+1);
             let mut cov_sub_vec = coverage_per_window[smooth_left_index..smooth_right_stop].to_vec();
             let coverage_smoothed = calc_median_usize(&mut cov_sub_vec);
@@ -120,8 +123,8 @@ impl<'a> Normalize<'a> {
             // use coverage_raw, not coverage_smoothed, because the latter might correspond to windows with no gc.
         }
         return OneChrData::new(chr, chr_len, coverage_per_window_tmp,
-                               no_of_fragments,
-                               coverage_per_base, no_of_windows);
+            no_of_fragments,
+            coverage_per_base, no_of_windows);
     }
 
     fn read_in_coverage_of_genome(&'a self, input_file_path: &'a Path) -> HashMap<usize, OneChrData> {
@@ -174,14 +177,16 @@ impl<'a> Normalize<'a> {
                 if prev_chr_idx!=-1 {
                     let chr_idx: usize = prev_chr_idx as usize;
                     let coverage_per_base = total_insert_len_of_chr as f32 / chr_len as f32;
-                    println_stderr!("{} reads so far for {:?}. Chromosome {} contains {} valid fragments.",
-                            no_of_reads, &input_file_path, &chr, no_of_valid_fragments_chr);
+                    println_stderr!("{} reads so far for {:?}. Chromosome {} \
+                        contains {} valid fragments.",
+                        no_of_reads, &input_file_path, &chr, no_of_valid_fragments_chr);
 
                     // handle previous chromosome data
-                    let one_chr_data = self.smooth_coverage_of_one_chr(chr.clone(), chr_len,
-                                                                       no_of_valid_fragments_chr,
-                                                                       coverage_per_base,
-                                                                       &coverage_per_window);
+                    let one_chr_data = self.smooth_coverage_of_one_chr(
+                        chr.clone(), chr_len,
+                        no_of_valid_fragments_chr,
+                        coverage_per_base,
+                        &coverage_per_window);
                     chr_idx2one_chr_data.insert(chr_idx, one_chr_data);
                 }
                 prev_chr_idx = current_chr_idx;
@@ -196,17 +201,21 @@ impl<'a> Normalize<'a> {
                 coverage_per_window.clear();
                 coverage_per_window = vec![0usize; no_of_windows_in_this_chr];
 
-                println_stderr!("New chromosome {}, length={}, window size={}, no_of_windows={}.",
-                     chr, chr_len, self.window_size, no_of_windows_in_this_chr);
+                println_stderr!("New chromosome {}, length={}, window size={}, \
+                    no_of_windows={}.",
+                    chr, chr_len, self.window_size, no_of_windows_in_this_chr);
 
             }
 
             if record.mapq()<30 {
                 continue
             }
-            if record.is_paired() && ( record.insert_size()<0 || record.insert_size()>self.max_fragment_len as i64 ||
-                !record.is_proper_pair() || record.is_mate_unmapped() || !record.is_first_in_template() ||
-                record.is_secondary() || record.is_duplicate() || record.is_supplementary() ) {
+            if record.is_paired() && ( record.insert_size()<0 || 
+                record.insert_size()>self.max_fragment_len as i64 ||
+                !record.is_proper_pair() || record.is_mate_unmapped() || 
+                !record.is_first_in_template() ||
+                record.is_secondary() || record.is_duplicate() || 
+                record.is_supplementary() ) {
                 continue;
             }
 
@@ -262,49 +271,66 @@ impl<'a> Normalize<'a> {
         if prev_chr_idx != -1 && self.chromosome_dict.contains_key(&chr) {
             let chr_idx: usize = prev_chr_idx as usize;
             let coverage_per_base = total_insert_len_of_chr as f32 / chr_len as f32;
-            println_stderr!("{} reads so far for {:?}. Chromosome {} contains {} valid fragments.",
-                            no_of_reads, &input_file_path, &chr, no_of_valid_fragments_chr);
+            println_stderr!("{} reads so far for {:?}. Chromosome {} contains \
+                {} valid fragments.",
+                no_of_reads, &input_file_path, &chr, no_of_valid_fragments_chr);
 
             // handle previous chromosome data
             let one_chr_data = self.smooth_coverage_of_one_chr(chr.clone(), chr_len,
-                                                               no_of_valid_fragments_chr,
-                                                               coverage_per_base,
-                                                               &coverage_per_window);
+                                    no_of_valid_fragments_chr,
+                                    coverage_per_base,
+                                    &coverage_per_window);
             chr_idx2one_chr_data.insert(chr_idx, one_chr_data);
         }
-        println_stderr!("Reading and smoothing of coverage from {:?} is Done. {} unique chromosomes, {} reads.",
-                input_file_path, no_of_unique_chrs, no_of_reads);
+        println_stderr!("Reading and smoothing of coverage from {:?} is Done. \
+            {} unique chromosomes, {} reads.",
+            input_file_path, no_of_unique_chrs, no_of_reads);
 
         chr_idx2one_chr_data
     }
 
-    fn output_coverage_ratio_of_one_chr(&self, one_chr_data_tumor: &OneChrData, one_chr_data_normal: &OneChrData,
-                                        coverage_mean_tumor: &f32, coverage_mean_normal: &f32){
+    fn output_coverage_ratio_of_one_chr(&self, one_chr_data_tumor: &OneChrData, 
+            one_chr_data_normal: &OneChrData,
+            coverage_mean_tumor: &f32, coverage_mean_normal: &f32){
         print_stderr!("Outputting normalized coverage ratio of {} ... ", one_chr_data_normal.chr);
         let no_of_windows = one_chr_data_tumor.no_of_windows;
-        let output_file_path = self.output_folder.join(format!("{}.ratio.w{}.csv.gz", one_chr_data_tumor.chr, self.window_size));
-        // let mut writer = csv::Writer::from_path(self.output_file_path).expect("Failed to create a writer.");
+        let output_file_path = self.output_folder.join(format!("{}.ratio.w{}.csv.gz", 
+            one_chr_data_tumor.chr, self.window_size));
+        // let mut writer = csv::Writer::from_path(self.output_file_path).\
+        //  expect("Failed to create a writer.");
         let output_f = File::create(&output_file_path)
             .expect(&format!("Error in creating output file {:?}", &output_file_path));
         let mut gz_writer = flate2::GzBuilder::new()
             .filename(output_file_path.file_stem().unwrap().to_str().unwrap())
             .comment("Comment")
             .write(output_f, Compression::default());
-        gz_writer.write_fmt(format_args!("#chr: {}\n", one_chr_data_tumor.chr)).unwrap();
-        gz_writer.write_fmt(format_args!("#chromosome_len: {}\n", one_chr_data_tumor.chr_len)).unwrap();
-        gz_writer.write_fmt(format_args!("#window_size: {}\n", self.window_size)).unwrap();
-        gz_writer.write_fmt(format_args!("#no_of_windows: {}\n", one_chr_data_tumor.no_of_windows)).unwrap();
-        gz_writer.write_fmt(format_args!("#no_of_fragments_tumor: {}\n", one_chr_data_tumor.no_of_fragments)).unwrap();
-        gz_writer.write_fmt(format_args!("#coverage_per_base_tumor: {}\n", one_chr_data_tumor.coverage_per_base)).unwrap();
-        gz_writer.write_fmt(format_args!("#no_of_fragments_normal: {}\n", one_chr_data_normal.no_of_fragments)).unwrap();
-        gz_writer.write_fmt(format_args!("#coverage_per_base_normal: {}\n", one_chr_data_normal.coverage_per_base)).unwrap();
-        gz_writer.write_fmt(format_args!("#genome-wide-coverage-mean-tumor: {}\n", coverage_mean_tumor)).unwrap();
-        gz_writer.write_fmt(format_args!("#genome-wide-coverage-mean-normal: {}\n", coverage_mean_normal)).unwrap();
+        gz_writer.write_fmt(format_args!("#chr: {}\n", 
+            one_chr_data_tumor.chr)).unwrap();
+        gz_writer.write_fmt(format_args!("#chromosome_len: {}\n", 
+            one_chr_data_tumor.chr_len)).unwrap();
+        gz_writer.write_fmt(format_args!("#window_size: {}\n", 
+            self.window_size)).unwrap();
+        gz_writer.write_fmt(format_args!("#no_of_windows: {}\n", 
+            one_chr_data_tumor.no_of_windows)).unwrap();
+        gz_writer.write_fmt(format_args!("#no_of_fragments_tumor: {}\n", 
+            one_chr_data_tumor.no_of_fragments)).unwrap();
+        gz_writer.write_fmt(format_args!("#coverage_per_base_tumor: {}\n", 
+            one_chr_data_tumor.coverage_per_base)).unwrap();
+        gz_writer.write_fmt(format_args!("#no_of_fragments_normal: {}\n", 
+            one_chr_data_normal.no_of_fragments)).unwrap();
+        gz_writer.write_fmt(format_args!("#coverage_per_base_normal: {}\n", 
+            one_chr_data_normal.coverage_per_base)).unwrap();
+        gz_writer.write_fmt(format_args!("#genome-wide-coverage-mean-tumor: {}\n",
+            coverage_mean_tumor)).unwrap();
+        gz_writer.write_fmt(format_args!("#genome-wide-coverage-mean-normal: {}\n", 
+            coverage_mean_normal)).unwrap();
 
         if self.debug>0 {
-            gz_writer.write_fmt(format_args!("start,coverage_ratio,coverage_tumor,coverage_tumor_adj,coverage_normal,coverage_normal_adj\n")).unwrap();
+            gz_writer.write_fmt(format_args!("start,coverage_ratio,coverage_tumor,\
+                coverage_tumor_adj,coverage_normal,coverage_normal_adj\n")).unwrap();
         } else {
-            gz_writer.write_fmt(format_args!("start,coverage_ratio,coverage_tumor_adj,coverage_normal_adj\n")).unwrap();
+            gz_writer.write_fmt(format_args!("start,coverage_ratio,\
+                coverage_tumor_adj,coverage_normal_adj\n")).unwrap();
         }
 
         let coverage_per_window_tumor = &one_chr_data_tumor.coverage_per_window;
@@ -317,25 +343,29 @@ impl<'a> Normalize<'a> {
             let coverage_normal = coverage_per_window_normal[window_index] as f32;
             if coverage_normal > 0.0 && coverage_normal < self.max_coverage as f32
                 && coverage_tumor >0.0 && coverage_tumor < self.max_coverage as f32 {
-                //coverage_tumor usually won't be 0 because a deletion => zero coverage only if it's 100% pure tumor.
-                // its gc_ratio_in is -1. cov=0 (unsequenced => unknown , not sure if it's deletion or not sequenced).
+                //coverage_tumor usually won't be 0 because a deletion => zero \
+                //  coverage only if it's 100% pure tumor.
+                // its gc_ratio_in is -1. cov=0 (unsequenced => unknown , \
+                //    not sure if it's deletion or not sequenced).
                 // cov=0 data is not fed into GC-regression. it will cause cov_adj_array_tumor[] out of bounds error.
                 let coverage_tumor_adj = coverage_tumor / coverage_mean_tumor;
                 let coverage_normal_adj = coverage_normal / coverage_mean_normal;
                 let coverage_ratio = coverage_tumor_adj / coverage_normal_adj;
-                cov_ratio_int_smoothed_vec[window_index] = (coverage_ratio * self.float_multiplier as f32) as i32;
+                cov_ratio_int_smoothed_vec[window_index] = 
+                    (coverage_ratio * self.float_multiplier as f32) as i32;
             }
         }
         for window_index in 0..no_of_windows {
             //smooth over neighboring windows.
             let smooth_left_index = cmp::max(0 as i32,
-                                             window_index as i32 - self.smooth_window_half_size as i32) as usize;
+                window_index as i32 - self.smooth_window_half_size as i32) as usize;
             let smooth_right_stop = cmp::min(no_of_windows, window_index+self.smooth_window_half_size+1);
             let mut ratio_sub_vec = cov_ratio_int_smoothed_vec[smooth_left_index..smooth_right_stop].to_vec();
             let ratio_median_int = calc_median_i32(&mut ratio_sub_vec);
             let coverage_ratio = ratio_median_int as f32/self.float_multiplier as f32;
             if coverage_ratio>0.0 {
-                // coverage_ratio=0 is excluded happen because coverage_tumor=0 are not included in smooth calculation.
+                // coverage_ratio=0 is excluded happen because coverage_tumor=0 \
+                //  are not included in smooth calculation.
                 // if coverage_ratio=0, it means the neighboring -1 (unknown) ratio has been used.
                 let coverage_tumor = coverage_per_window_tumor[window_index] as f32;
                 let coverage_tumor_adj = coverage_tumor / coverage_mean_tumor;
@@ -343,18 +373,21 @@ impl<'a> Normalize<'a> {
                 let coverage_normal = coverage_per_window_normal[window_index] as f32;
                 let coverage_normal_adj = coverage_normal / coverage_mean_normal;
                 if self.debug>0 {
-                    gz_writer.write_fmt(format_args!("{},{},{},{},{},{}\n", window_index * self.window_size + 1,
-                                                     coverage_ratio, coverage_tumor, coverage_tumor_adj,
-                                                     coverage_normal, coverage_normal_adj)
+                    gz_writer.write_fmt(format_args!("{},{},{},{},{},{}\n", 
+                        window_index * self.window_size + 1,
+                        coverage_ratio, coverage_tumor, coverage_tumor_adj,
+                        coverage_normal, coverage_normal_adj)
                     ).unwrap();
                 } else{
-                    gz_writer.write_fmt(format_args!("{},{},{},{}\n", window_index * self.window_size + 1,
-                                                     coverage_ratio, coverage_tumor_adj, coverage_normal_adj)
+                    gz_writer.write_fmt(format_args!("{},{},{},{}\n", 
+                        window_index * self.window_size + 1,
+                        coverage_ratio, coverage_tumor_adj, coverage_normal_adj)
                     ).unwrap();
 
                 }
             }
-            //gz_writer.write(&record.as_byte_record()[1] + "\n").expect("Error in writing record into gzipped file.");
+            //gz_writer.write(&record.as_byte_record()[1] + "\n").\
+            //  expect("Error in writing record into gzipped file.");
         }
 
         gz_writer.finish()
@@ -385,8 +418,8 @@ impl<'a> Normalize<'a> {
         let coverage_mean_normal = self.calculate_genome_wide_cov_mean(&chr_idx2one_chr_data_normal);
         for chr_idx in 0..self.chromosome_dict.len() {
             self.output_coverage_ratio_of_one_chr(&chr_idx2one_chr_data_tumor[&chr_idx],
-                                                  &chr_idx2one_chr_data_normal[&chr_idx],
-                                                  &coverage_mean_tumor, &coverage_mean_normal);
+                &chr_idx2one_chr_data_normal[&chr_idx],
+                &coverage_mean_tumor, &coverage_mean_normal);
         }
 
     }

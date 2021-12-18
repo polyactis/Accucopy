@@ -1,5 +1,5 @@
 #!/usr/bin/env python2
-
+# -*- coding: future_fstrings -*-
 from argparse import ArgumentParser
 import logging
 import os
@@ -9,13 +9,14 @@ import shutil,re
 from datetime import datetime, timedelta
 from pyflow import WorkflowRunner
 
-
 class MainFlow(WorkflowRunner):
     def __init__(self, configure_filepath=None, tumor_bam=None,
         normal_bam=None, output_dir=None,
         snp_output_dir=None,
-        snp_coverage_min=2,
-        snp_coverage_var_vs_mean_ratio=10.0, clean=False,
+        segment_stddev_divider=20, snp_coverage_min=2,
+        snp_coverage_var_vs_mean_ratio=10.0,
+        no_of_autosomes=22,
+        clean=False,
         step=0, debug=False, auto=1,
         max_no_of_peaks_for_logL=3, nCores=4, **keywords):
         self.configure_filepath = configure_filepath
@@ -23,8 +24,10 @@ class MainFlow(WorkflowRunner):
         self.normal_bam = normal_bam
         self.output_dir = output_dir
         self.snp_output_dir = snp_output_dir
+        self.segment_stddev_divider = segment_stddev_divider
         self.snp_coverage_min = snp_coverage_min
         self.snp_coverage_var_vs_mean_ratio = snp_coverage_var_vs_mean_ratio
+        self.no_of_autosomes = no_of_autosomes
         self.clean = clean
         self.step = step
         self.debug = debug
@@ -60,8 +63,6 @@ class MainFlow(WorkflowRunner):
 
         self.chromosomeNames = None
         self.NUM_AUTO_CHR = None
-
-
 
         if self.snp_output_dir:
             self.strelka_output_dir = self.snp_output_dir
@@ -201,15 +202,14 @@ class MainFlow(WorkflowRunner):
             oneThousandSNPFilepath = os.path.join(self.ref_folder_path, "snp_sites.gz")
             #input: tumor bam
             #output: self.vcf_tumor_file_path
-            cmd = "%s/bin/configureStrelkaGermlineWorkflow.py --bam %s "\
-                "--bam %s --ref %s --callRegions %s --runDir %s" % (
-                self.strelka_path, self.normal_bam, self.tumor_bam, 
-                os.path.join(self.ref_folder_path, "genome.fa"), 
-                oneThousandSNPFilepath, self.strelka_output_dir)
+            cmd = f"{self.strelka_path}/bin/configureStrelkaGermlineWorkflow.py "\
+                f"--bam {self.normal_bam} "\
+                f"--bam {self.tumor_bam} "\
+                f"--ref {os.path.join(self.ref_folder_path, 'genome.fa')} "\
+                f"--callRegions {oneThousandSNPFilepath} --runDir {self.strelka_output_dir}"
             strelka_prepare_job = self.addTask("strelka_prepare", cmd,
                 dependencies=[indexNormalBamJob, indexTumorBamJob])
-            cmd = "%s/runWorkflow.py -m local -j %s" % \
-                (self.strelka_output_dir, self.strelka_cores)
+            cmd = f"{self.strelka_output_dir}/runWorkflow.py -m local -j {self.strelka_cores}"
             strelka_call_snp_job = self.addTask("strelka_call_snp", cmd,
                 nCores=self.strelka_cores, dependencies=[strelka_prepare_job])
         else:
@@ -239,19 +239,14 @@ class MainFlow(WorkflowRunner):
             #   tumor/normal.cov.adj.factor.txt
             reg_input_base_filename = "reg.in.txt"
             reg_output_base_filename = "reg.out.txt"
-            cmd = '%s normalize -t %s -n %s --genome_dict_path %s -w %s -l %s \
-                --smooth_window_half_size %s --max_coverage %s --debug %s \
-                -o %s 2>&1 | tee -a %s' % \
-                    (os.path.join(self.binary_folder, "maestre"),
-                     self.tumor_bam, self.normal_bam,
-                     os.path.join(self.ref_folder_path, "genome.dict"),
-                     self.window_size,
-                     self.read_len, self.smooth_window_half_size,
-                     self.max_coverage,
-                     self.debug,
-                     self.output_dir,
-                     self.infer_status_out_path
-                    )
+            cmd = f'{os.path.join(self.binary_folder, "maestre")} normalize '\
+                f'-t {self.tumor_bam} -n {self.normal_bam} '\
+                f'--genome_dict_path {os.path.join(self.ref_folder_path, "genome.dict")} '\
+                f'-w {self.window_size} -l {self.read_len} '\
+                f'--smooth_window_half_size {self.smooth_window_half_size} '\
+                f'--max_coverage {self.max_coverage} --debug {self.debug} '\
+                f'--no_of_autosomes {self.no_of_autosomes} '\
+                f'-o {self.output_dir} 2>&1 | tee -a {self.infer_status_out_path}'
             normalize_jobs.append(self.addTask("normalize", cmd,
                 dependencies=[indexTumorBamJob, indexNormalBamJob]))
             #add a gzip job
@@ -270,11 +265,9 @@ class MainFlow(WorkflowRunner):
 
         if self.debug:
             #plot the coverage plot between tumor and normal by adjust
-            cmd = "%s -i %s -o %s" % (
-                os.path.join(self.binary_folder, \
-                    "plot_coverage_after_normalization.py"),
-                os.path.join(self.output_dir, "chr22.ratio.w%s.csv.gz"%self.window_size),
-                os.path.join(self.output_dir, "plot.tumor_vs_normal.chr22.png"))
+            cmd = f'{os.path.join(self.binary_folder, "plot_coverage_after_normalization.py")} '\
+                f'-i {os.path.join(self.output_dir, "chr22.ratio.w%s.csv.gz"%self.window_size)} '\
+                f'-o {os.path.join(self.output_dir, "plot.tumor_vs_normal.chr22.png")}'
             plot_coverage_job = self.addTask("plot_tumor_normal_coverage", cmd,
                 dependencies=normalize_jobs)
 
@@ -282,7 +275,7 @@ class MainFlow(WorkflowRunner):
             #plot GC normalization png
             cmd = "%s -r %s -a %s -o %s" % (
                 os.path.join(self.binary_folder, "plot_GC_normalization.py"),
-                 os.path.join(self.output_dir, "reg.in.txt"),
+                os.path.join(self.output_dir, "reg.in.txt"),
                 os.path.join(self.output_dir, "cov.adj.factor.txt"),
                 os.path.join(self.output_dir, "plot.gc.adj.png"))
             plot_gc_adjust_tumor_job = self.addTask("plot_gc_correction", 
@@ -303,11 +296,10 @@ class MainFlow(WorkflowRunner):
             sys.stderr.write(status_string)
             #input: self.vcf_tumor_file_path, self.vcf_normal_file_path
             #output: het_snp
-            cmd = "%s select_het_snp -s %s -m 2 -x 200 --debug 0 -o %s 2>&1 "\
-                "| tee -a %s" % (
-                os.path.join(self.binary_folder, "maestre"),
-                self.two_sample_snp_file, self.het_snp_filepath,
-                self.infer_status_out_path)
+            cmd = f"{os.path.join(self.binary_folder, 'maestre')} "\
+                f"select_het_snp -s {self.two_sample_snp_file} -m 2 -x 200 "\
+                f"--debug 0 -o {self.het_snp_filepath} 2>&1 "\
+                f"| tee -a {self.infer_status_out_path}"
             call_het_snps_tumor_job = self.addTask("call_het_snps_tumor", cmd,
                 dependencies=[strelka_call_snp_job])
 
@@ -338,23 +330,17 @@ class MainFlow(WorkflowRunner):
             for chr_index in range(self.NUM_AUTO_CHR):
                 chromosome = self.chromosomeNames[chr_index]
                 segment_out_path = os.path.join(self.output_dir, \
-                    "%s.segments.M%s.T%s.tsv"%(chromosome, \
-                        self.min_segment_len, self.t_score_threshold))
+                    f"{chromosome}.segments.M{self.min_segment_len}."\
+                    f"T{self.t_score_threshold}.tsv")
                 segment_out_ls.append(segment_out_path)
-                cmd = '%s --chromosome_id %s --window_size %s -M %s -T %s '\
-                    '-i %s -o %s 2>&1 | tee -a %s' % \
-                    (os.path.join(self.binary_folder, "GADA"),
-                    chromosome, self.window_size, self.min_segment_len,
-                    self.t_score_threshold,
-                    normalize_output_file_ls[chr_index],
-                    segment_out_path,
-                    self.infer_status_out_path)
+                cmd = f'{os.path.join(self.binary_folder, "GADA")} '\
+                    f'--chromosome_id {chromosome} --window_size {self.window_size} '\
+                    f'-M {self.min_segment_len} -T {self.t_score_threshold} '\
+                    f'-i {normalize_output_file_ls[chr_index]} -o {segment_out_path} '\
+                    f'2>&1 | tee -a { self.infer_status_out_path}'
                 segment_jobs.append(self.addTask("segment_%s"%chromosome, cmd, 
                     dependencies=normalize_jobs))
-
-
-            cmd = "cat %s | gzip > %s" % (" ".join(segment_out_ls),
-                self.segment_data_filepath)
+            cmd = f"cat {' '.join(segment_out_ls)} | gzip > {self.segment_data_filepath}"
             reduce_all_segments_job = self.addTask("reduce_all_segments", cmd,
                 dependencies=segment_jobs)
             #remove all individual segments files
@@ -370,9 +356,9 @@ class MainFlow(WorkflowRunner):
             self.startTimeList.append(datetime.now())
             status_string = "Last step time span: %s\n" % \
                 (self.startTimeList[-1] - self.startTimeList[-2])
-            status_string += "step 5: Infer tumor purity and ploidy.\n\t"\
-                "start time: %s\n" % \
-                self.startTimeList[-1]
+            status_string += f"step 5: Infer tumor purity and ploidy.\n\t"\
+                f"start time: {self.startTimeList[-1]}\n"
+                
             sys.stderr.write(status_string)
 
             #input: self.segment_data_filepath (all_segments),
@@ -382,22 +368,19 @@ class MainFlow(WorkflowRunner):
             #   rc_ratio_window_count_smoothed.tsv, peak_bounds.tsv
             #output: auto.tsv, cnv.output.tsv
             
-            cmd = "%s %s %s %s %s %s %s %s %s %s %s 2>&1 | tee -a %s" % (
-                os.path.join(self.binary_folder, "infer"),
-                self.configure_filepath, self.segment_data_filepath,
-                self.het_snp_filepath, self.output_dir,
-                self.snp_coverage_min,
-                self.snp_coverage_var_vs_mean_ratio,
-                self.max_no_of_peaks_for_logL,
-                self.debug, self.auto,
-                os.path.join(self.ref_folder_path, "genome.dict"), 
-                self.infer_status_out_path)
+            cmd = f"{os.path.join(self.binary_folder, 'infer')} "\
+                f"{self.configure_filepath} {self.segment_data_filepath} "\
+                f"{self.het_snp_filepath} {self.output_dir} "\
+                f"{self.segment_stddev_divider} {self.snp_coverage_min} "\
+                f"{self.snp_coverage_var_vs_mean_ratio} "\
+                f"{self.max_no_of_peaks_for_logL} {self.debug} {self.auto} "\
+                f"{os.path.join(self.ref_folder_path, 'genome.dict')} "\
+                f" 2>&1 | tee -a {self.infer_status_out_path}"
             infer_job = self.addTask("infer", cmd, 
                 dependencies=[reduce_all_segments_job, call_het_snps_tumor_job])
             if self.debug:
                 self.addTask("gzip_rc_ratio_no_of_windows_by_chr",
-                    "gzip %s/rc_ratio_no_of_windows_by_chr.tsv" % (
-                        self.output_dir),
+                    f"gzip {self.output_dir}/rc_ratio_no_of_windows_by_chr.tsv",
                     dependencies=infer_job)
         else:
             infer_job = self.addTask("infer")
@@ -426,40 +409,38 @@ class MainFlow(WorkflowRunner):
             #   self.configure_filepath, \
             #	tumor_samplename, self.output_dir,
             #   os.path.join(self.output_dir, "plot.cnv.jpg"))
-            cmd = "%s -i %s -r %s -o %s" % \
-                (os.path.join(self.binary_folder, "plotCPandMCP.py"),
-                os.path.join(self.output_dir, "cnv.output.tsv"),
-                os.path.join(self.ref_folder_path, "genome.dict"),
-                os.path.join(self.output_dir, "plot.cnv.png"))
+            cmd = f"{os.path.join(self.binary_folder, 'plotCPandMCP.py')} "\
+                f"-i {os.path.join(self.output_dir, 'cnv.output.tsv')} "\
+                f"-r {os.path.join(self.ref_folder_path, 'genome.dict')} "\
+                f"--no_of_autosomes {self.no_of_autosomes} "\
+                f"-o {os.path.join(self.output_dir, 'plot.cnv.png')} "
+
             plot_cnv_job = self.addTask("plot_cnv", cmd, dependencies=infer_job)
 
             if self.debug:
                 #plot the auto_cor diff program
                 autocorPath =os.path.join(self.output_dir, "auto.tsv")
-                cmd = "%s -i %s -o %s -s %s -a %s" % (\
-                    os.path.join(self.binary_folder, "plot_autocor_diff.py"),
-                    os.path.join(self.output_dir, "GADA.in.tsv"),
-                    os.path.join(self.output_dir, "plot.tre.autocor.png"),
-                    os.path.join(self.output_dir, "GADA.out.tsv"),
-                    autocorPath)
+                cmd = f"{os.path.join(self.binary_folder, 'plot_autocor_diff.py')} "\
+                    f"-i {os.path.join(self.output_dir, 'GADA.in.tsv')} "\
+                    f"-o {os.path.join(self.output_dir, 'plot.tre.autocor.png')} "\
+                    f"-s {os.path.join(self.output_dir, 'GADA.out.tsv')} "\
+                    f"-a {autocorPath}"
                 plot_autocor_diff_job = self.addTask("plot_autocor_diff", cmd, \
                     dependencies=infer_job)
 
                 #tre job may fail. so run it after plot_autocor_diff_job
                 #  (which will not fail if input files do not exist)
-                cmd = "%s -i %s -p %s -o %s" % \
-                    (os.path.join(self.binary_folder, "plot_tre.py"),
-                    rcRatioSmoothedPath, peakBoundsPath,
-                    os.path.join(self.output_dir, "plot.tre.png"))
+                cmd = f"{os.path.join(self.binary_folder, 'plot_tre.py')} "\
+                    f"-i {rcRatioSmoothedPath} -p {peakBoundsPath} "\
+                    f"-o {os.path.join(self.output_dir, 'plot.tre.png')}"
                 plot_tre_job = self.addTask("plot_tre", cmd, dependencies=infer_job)
 
                 #plot model selection result.
                 hdf5_file = os.path.join(self.output_dir, \
                     "model_selection_log", "model_selection.h5")
                 plot_output = os.path.join(self.output_dir, "model_selection_log")
-                cmd = "%s -f %s -o %s" % (os.path.join(self.binary_folder, \
-                    "plot_model_select_result.py"),
-                    hdf5_file, plot_output)
+                cmd = f"{os.path.join(self.binary_folder, 'plot_model_select_result.py')} "\
+                    f"-f {hdf5_file} -o {plot_output}"
                 plot_model_select_job = self.addTask("plot_model_select", cmd,
                     dependencies=infer_job)
 
@@ -487,7 +468,7 @@ if __name__ == '__main__':
         'https://www.yfish.org/display/PUB/Accucopy for help or '
         'email polyactis@gmail.com.')
     ap.add_argument("-v", "--version", action="version", 
-        version="eaba7638-debug")
+        version="32acfd1e-debug")
     ap.add_argument("-c", "--configure_filepath", type=str, required=True,
         help="the path to the configure file.")
     ap.add_argument("-t", "--tumor_bam", type=str, required=True,
@@ -503,8 +484,15 @@ if __name__ == '__main__':
         "Default is the same folder as the bam file.")
     ap.add_argument("--clean", action='store_true',
         help="Toggle to remove the existing output folders and files.")
+    ap.add_argument("--segment_stddev_divider", type=float, default=20.0,
+        help="A factor that reduces the segment noise level. "
+        "The default value (%(default)s) is recommended.")
+    ap.add_argument("--no_of_autosomes", type=int, default=22,
+        help="The number of autosome chromosomes for the species. "\
+            "Sex chromosomes are excluded. "
+        "Default is %(default)s.")
     ap.add_argument("--snp_coverage_min", type=int, default=2,
-        help="the minimum SNP coverage in adjusting the expected SNP MAF. "
+        help="The minimum SNP coverage in adjusting the expected SNP MAF. "
         "Default is %(default)s.")
     ap.add_argument("--snp_coverage_var_vs_mean_ratio", type=float, default=10.0,
         help="Instead of using the observed SNP coverage variance (not consistent), "
@@ -539,8 +527,10 @@ if __name__ == '__main__':
     wflow = MainFlow(args.configure_filepath, args.tumor_bam, args.normal_bam,
         output_dir=args.output_dir,
         snp_output_dir=args.snp_output_dir,
+        segment_stddev_divider=args.segment_stddev_divider,
         snp_coverage_min=args.snp_coverage_min,
         snp_coverage_var_vs_mean_ratio=args.snp_coverage_var_vs_mean_ratio,
+        no_of_autosomes=args.no_of_autosomes,
         clean=args.clean, step=args.step, debug=args.debug, auto=args.auto,
         max_no_of_peaks_for_logL=args.max_no_of_peaks_for_logL,
         nCores=args.nCores)

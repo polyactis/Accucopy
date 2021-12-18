@@ -28,14 +28,16 @@ class OnePeak {
    public:
     OnePeak() : no_of_windows(0), no_of_snps(0) {
         peak_center_int=-1;
+        peak_height = -1.0;
         peak_index = -1;
         lower_bound_int=-1;
         upper_bound_int=-1;
         half_width_int=-1;
     }
-    OnePeak(int peak_center_int, int peak_index, int lower_bound_int, int upper_bound_int,
+    OnePeak(int peak_center_int, double peak_height, int peak_index, int lower_bound_int, int upper_bound_int,
             int half_width_int)
         : peak_center_int(peak_center_int),
+          peak_height(peak_height),
           peak_index(peak_index),
           lower_bound_int(lower_bound_int),
           upper_bound_int(upper_bound_int),
@@ -47,6 +49,7 @@ class OnePeak {
         segment_obj_vector.clear();
     }
     int peak_center_int;
+    double peak_height;
     int peak_index;
     int lower_bound_int;
     int upper_bound_int;
@@ -179,6 +182,7 @@ class Infer {
    public:
     Infer(string configFilepath, string segment_data_input_path,
           string snp_data_input_path, string output_dir,
+          float segment_stddev_divider,
           int snp_coverage_min, float snp_coverage_var_vs_mean_ratio,
           int no_of_peaks_for_logL,
           int debug, int auto_, string refdictFilepath);
@@ -236,6 +240,7 @@ class Infer {
     string _segment_data_input_path;
     string _snp_data_input_path;
     string _output_dir;
+    float _segment_stddev_divider;
     int _no_of_peaks_for_logL;
     float _snp_maf_stddev_divider;
     //parameter used to adjust snp expected MAF, adjust_maf_expect(). Being same to 6, used in selecting heterozygous SNPs is no good.
@@ -268,7 +273,8 @@ class Infer {
     int _total_no_of_snps_used;
     int _total_no_of_segments;
     int _total_no_of_segments_used;
-
+    // maximum peak half width, consistent across different periods.
+    int _max_peak_half_width;
     OnePeriod _period_obj_from_autocor;  // period_int, lower bound, upper
     // bound
     OnePeriod _period_obj_from_logL;

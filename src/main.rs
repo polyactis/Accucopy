@@ -11,15 +11,16 @@ use clap::{Arg, App, SubCommand};
 use std::collections::HashMap;
 use users::{get_user_by_uid, get_current_uid};
 
+
 fn main() {
     let matches = App::new("Accucopy")
-        .version("eaba7638-014TKBC3-debug")
+        .version("cce96cee-014TKBC3-debug")
         .author("www.yfish.org")
         .about("A program that infers tumor purity, ploidy from tumor-normal WGS data")
         .subcommand(SubCommand::with_name("gc_index")
             .about("GC indexing for a reference genome, counting the number of GCs in \
                     overlapping windows of 1/5/25/125bp")
-            .version("eaba7638-014TKBC3-debug")
+            .version("cce96cee-014TKBC3-debug")
             .author("www.yfish.org")
             .arg(Arg::with_name("input_file")
                 .short("i")
@@ -43,9 +44,11 @@ fn main() {
             )
         )
         .subcommand(SubCommand::with_name("normalize")
-            .about("Smooth (window on either side also gets coverage) and normalize (divided by total fragment count) coverage of tumor and normal. output coverage ratio \
-                    (tumor/normal).")
-            .version("eaba7638-014TKBC3-debug")
+            .about("Smooth (window on either side also gets coverage) and normalize \
+                (divided by total fragment count) coverage of tumor and normal. \
+                And output coverage ratio \
+                (tumor/normal).")
+            .version("cce96cee-014TKBC3-debug")
             .author("www.yfish.org")
             .arg(Arg::with_name("read_len")
                 .short("l")
@@ -63,11 +66,19 @@ fn main() {
                 .required(true)
                 .takes_value(true)
             )
+            .arg(Arg::with_name("no_of_autosomes")
+                .long("no_of_autosomes")
+                .value_name("The Number of Autosomes")
+                .help("The number of autosomes. 22 for human.")
+                .required(true)
+                .takes_value(true)
+            )
             .arg(Arg::with_name("smooth_window_half_size")
                 .short("s")
                 .long("smooth_window_half_size")
                 .value_name("SMOOTH WINDOW HALF SIZE")
-                .help("Number of windows on either side that will be used to smooth coverage and tumor/normal coverage ratio.")
+                .help("Number of windows on either side that will be used to \
+                    smooth coverage and tumor/normal coverage ratio.")
                 .required(true)
                 .takes_value(true)
             )
@@ -75,7 +86,9 @@ fn main() {
                 .short("w")
                 .long("window_size")
                 .value_name("WINDOW SIZE")
-                .help("All fragments are grouped into windows to accrue coverage. Usually, it is equal to or smaller than the average insert size in paired end sequencing.")
+                .help("All fragments are grouped into windows to accrue coverage. \
+                    Usually, it is equal to or smaller than the average insert size \
+                    in paired end sequencing.")
                 .required(true)
                 .takes_value(true)
             )
@@ -119,7 +132,7 @@ fn main() {
         )
         .subcommand(SubCommand::with_name("select_het_snp")
             .about("Select heterozygous SNPs")
-            .version("eaba7638-014TKBC3-debug")
+            .version("cce96cee-014TKBC3-debug")
             .author("www.yfish.org")
             .arg(Arg::with_name("max_coverage")
                 .short("x")
@@ -163,7 +176,7 @@ fn main() {
         )
         .subcommand(SubCommand::with_name("infer")
             .about("infers tumor purity, ploidy from tumor-normal WGS data")
-            .version("eaba7638-014TKBC3-debug")
+            .version("cce96cee-014TKBC3-debug")
             .author("www.yfish.org")
             .arg(Arg::with_name("config")
                 .short("c")
@@ -176,7 +189,7 @@ fn main() {
         )
         .subcommand(SubCommand::with_name("recall_precision")
             .about("calculate recall and precision from truth result and predicted result")
-            .version("eaba7638-014TKBC3-debug")
+            .version("cce96cee-014TKBC3-debug")
             .author("www.yfish.org")
             .arg(Arg::with_name("truth_result_file_path")
                 .short("t")
@@ -216,17 +229,22 @@ fn main() {
         let genome_dict_path = matches.value_of("genome_dict_path").unwrap();
         let output_folder = matches.value_of("output_folder").unwrap();
         let max_coverage: usize = matches.value_of("max_coverage").unwrap().parse().unwrap();
-        let smooth_window_half_size: usize = matches.value_of("smooth_window_half_size").unwrap().parse().unwrap();
+        let no_of_autosomes: usize = matches.value_of("no_of_autosomes").unwrap().
+            parse().unwrap();
+        let smooth_window_half_size: usize = matches.value_of("smooth_window_half_size").
+            unwrap().parse().unwrap();
         let window_size: usize = matches.value_of("window_size").unwrap().parse().unwrap();
         let read_len: usize = matches.value_of("read_len").unwrap().parse().unwrap();
         let debug: i32 = matches.value_of("debug").unwrap().parse().unwrap();
 
-        let arguments = format!("-t {} -n {} -w {} -l {} --smooth_window_half_size {} --max_coverage {} -d {} -o {}",
-                                tumor_file_path, normal_file_path, window_size, read_len,
-                                smooth_window_half_size, max_coverage, debug, output_folder);
-        let ins = maestre::normalize::Normalize::new(tumor_file_path, normal_file_path, output_folder,
-                                 genome_dict_path, window_size, max_coverage, smooth_window_half_size,
-                                 debug);
+        let arguments = format!("-t {} -n {} -w {} -l {} --smooth_window_half_size {} \
+            --max_coverage {} --no_of_autosomes {} -d {} -o {}",
+            tumor_file_path, normal_file_path, window_size, read_len,
+            smooth_window_half_size, max_coverage, no_of_autosomes, debug, output_folder);
+        let ins = maestre::normalize::Normalize::new(
+            tumor_file_path, normal_file_path, output_folder,
+            genome_dict_path, window_size, max_coverage, no_of_autosomes,
+            smooth_window_half_size, debug);
         ins.run();
     } else if let Some(matches) = matches.subcommand_matches("select_het_snp") {
         let snp_file = matches.value_of("snp_file").unwrap();
@@ -236,10 +254,10 @@ fn main() {
         let debug: i32 = matches.value_of("debug").unwrap().parse().unwrap();
 
         let arguments = format!("-s {} --min_coverage {} --max_coverage {} -d {} -o {}",
-                                snp_file, min_coverage, max_coverage, debug, output_file_path);
+            snp_file, min_coverage, max_coverage, debug, output_file_path);
 
         let ins = maestre::select_het_snp::SelectHetSNP::new(snp_file, output_file_path,
-                                                              min_coverage, max_coverage);
+            min_coverage, max_coverage);
         ins.run();
     }else if let Some(matches) = matches.subcommand_matches("recall_precision") {
         let truth_result_file_path = matches.value_of("truth_result_file_path").unwrap();
@@ -247,9 +265,9 @@ fn main() {
         let output_file_path = matches.value_of("output_file_path").unwrap();
 
         let arguments= format!("--truth_result_file_path {} --predicted_result_file_path {} -o {}",
-                               truth_result_file_path, predicted_result_file_path, output_file_path);
+            truth_result_file_path, predicted_result_file_path, output_file_path);
         let ins = maestre::recall_precision::RecallPrecision::new(truth_result_file_path,
-                                                                   predicted_result_file_path,output_file_path);
+            predicted_result_file_path,output_file_path);
         ins.run();
     } else {
         eprintln!("Sub command not present. Try --help.");
