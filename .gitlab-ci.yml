@@ -1,6 +1,6 @@
 before_script:
   - echo "before script"
-  - export PATH="$HOME/.cargo/bin:$PATH"
+  - export PATH="$HOME/.local/cmake-3.23.0-rc1-linux-x86_64/bin:$HOME/.cargo/bin:$PATH"
 
 after_script:
   - echo "after script"
