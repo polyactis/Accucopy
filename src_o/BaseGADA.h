@@ -1,28 +1,28 @@
 /*=================================================================
- * BaseGenomeBreaks.h
- *
+ * BaseGADA.c
+ * All basic functions for SBL, BE, etc.
  *=================================================================*/
 /*
- This File is part of GADA
+ This File is part of eGADA
 
- GADA v1.0 Genome Alteration Detection Algorithm
- Copyright (C) 2008  Childrens Hospital of Los Angeles
+ eGADA: enhanced Genome Alteration Detection Algorithm
 
- GADA is free software: you can redistribute it and/or modify
+ eGADA is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
  the Free Software Foundation, either version 3 of the License, or
  any later version.
 
- GADA is distributed in the hope that it will be useful,
+ eGADA is distributed in the hope that it will be useful,
  but WITHOUT ANY WARRANTY; without even the implied warranty of
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  GNU General Public License for more details.
 
  You should have received a copy of the GNU General Public License
- along with GADA.  If not, see <http://www.gnu.org/licenses/>.
+ along with eGADA.  If not, see <http://www.gnu.org/licenses/>.
 
- Author:
- Roger Pique-Regi    piquereg@usc.edu
+ Authors:
+ Yu S. Huang,  polyactis@gmail.com
+ Roger Pique-Regi,   piquereg@usc.edu
 
  */
 
@@ -61,7 +61,7 @@ class BreakPointKey{
 	 * 	content is similar to BreakPoint but different ordering function.
 	 */
 	// for output
-	friend ostream& operator<<(ostream& out, BreakPointKey& bpKey){
+	friend ostream& operator<<(ostream& out, const BreakPointKey& bpKey){
 		/*
 		 * 2013.09.22 something wrong here, it can't be streamed to an ostream
 		 */
@@ -174,7 +174,7 @@ public:
 
 class BreakPoint{
 	// for output
-	friend ostream& operator<<(ostream& out, BreakPoint& breakPoint){
+	friend ostream& operator<<(ostream& out, const BreakPoint& breakPoint){
 		out << boost::format("position=%1%, tscore=%2%, weight=%3%, length=%4%, MinSegLen=%5%, totalLength=%6%")%
 				breakPoint.position % breakPoint.tscore % breakPoint.weight %
 				breakPoint.segmentLength % breakPoint.MinSegLen % breakPoint.totalLength;

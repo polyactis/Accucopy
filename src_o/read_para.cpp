@@ -1,3 +1,8 @@
+/*
+ Author:
+ Yu S. Huang, polyactis@gmail.com
+
+ */
 #include "read_para.h"
 
 using namespace std;

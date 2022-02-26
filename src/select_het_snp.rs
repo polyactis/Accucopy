@@ -1,3 +1,8 @@
+/*
+Author:
+ Yu S. Huang, polyactis@gmail.com
+ Xinping Fan, 897488736@qq.com
+ */
 extern crate time;
 
 use flate2;

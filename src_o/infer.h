@@ -1,3 +1,8 @@
+/*
+ Author:
+ Yu S. Huang, polyactis@gmail.com
+ */
+
 #pragma once
 #ifndef __INFER_H
 #define __INFER_H
@@ -185,7 +190,7 @@ class Infer {
           float segment_stddev_divider,
           int snp_coverage_min, float snp_coverage_var_vs_mean_ratio,
           int no_of_peaks_for_logL,
-          int debug, int auto_, string refdictFilepath);
+          int debug, int auto_, string refdictFilepath, int custom_period_id);
     ~Infer();
     int run();
 
@@ -249,6 +254,7 @@ class Infer {
     int _debug;
     int _auto;
     int _returnCode;
+    int custom_period_id; // user specify period to use
 
     Config _config;
     RefDictInfo ref_dict_info;

@@ -1,3 +1,9 @@
+/*
+ Author:
+ Yu S. Huang, polyactis@gmail.com
+ Xinping Fan, 897488736@qq.com
+
+ */
 #pragma once
 #ifndef __PROB_H
 #define __PROB_H

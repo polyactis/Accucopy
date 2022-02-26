@@ -1,3 +1,9 @@
+/*
+Author:
+ Yu S. Huang, polyactis@gmail.com
+ Xinping Fan, 897488736@qq.com
+ */
+
 #include "infer.h"
 #include "model_selection.h"
 #include <boost/iostreams/stream.hpp>
@@ -22,7 +28,7 @@ Infer::Infer(string configFilepath, string segment_data_input_path,
              float segment_stddev_divider,
              int snp_coverage_min, float snp_coverage_var_vs_mean_ratio,
              int no_of_peaks_for_logL,
-             int debug, int auto_, string refdictFilepath)
+             int debug, int auto_, string refdictFilepath, int custom_period_id)
         : _configFilepath(configFilepath),
           _segment_data_input_path(segment_data_input_path),
           _snp_data_input_path(snp_data_input_path),
@@ -33,7 +39,8 @@ Infer::Infer(string configFilepath, string segment_data_input_path,
           _no_of_peaks_for_logL(no_of_peaks_for_logL),
           _debug(debug),
           _auto(auto_),
-          _refdictFilepath(refdictFilepath)
+          _refdictFilepath(refdictFilepath),
+          custom_period_id(custom_period_id)
 {
     _periodObjVector.reserve(5);
     _snp_maf_stddev_divider = 20.0;
@@ -890,12 +897,41 @@ int Infer::output_peak_bounds(vector<OnePeak> &peak_obj_vector)
 
 OnePeriod Infer::infer_best_period_by_logL(vector<OnePeriod> &candidate_period_vec)
 {
+    int candidate_periods_size = candidate_period_vec.size();
     cerr << fmt::format("Inferring the best period by log likelihood from {} candidates ... \n",
-                        candidate_period_vec.size());
+                        candidate_periods_size);
     double best_period_logL = (-1e99);
     OnePeriod best_period_obj = OnePeriod();
-    for (int candidate_period_index=0;
-         candidate_period_index<candidate_period_vec.size();
+    if (custom_period_id > candidate_periods_size) {
+        string suffix = "th";
+        switch(custom_period_id) {
+            case 1: suffix = "st"; break;
+            case 2: suffix = "nd"; break;
+            case 3: suffix = "rd"; break;
+            default: break;
+        }
+        string warn_msg = fmt::format(
+            "Warning: periods have {} candidates, but you have specified to use " \
+            "{}{} period. This setting will be ignored and which period to use "
+            "will be detected automatically.\n",
+            candidate_periods_size, custom_period_id, suffix);
+        custom_period_id = 0;
+        cerr << warn_msg;
+    } else if (custom_period_id > 0) {
+        string suffix = "th";
+        switch(custom_period_id) {
+            case 1: suffix = "st"; break;
+            case 2: suffix = "nd"; break;
+            case 3: suffix = "rd"; break;
+            default: break;
+        }
+        string warn_msg = fmt::format(
+            "Warning: {}{}period will be forced to use!\n",
+            custom_period_id, suffix);
+        cerr << warn_msg;
+    }
+    for (int candidate_period_index = 0;
+         candidate_period_index < candidate_periods_size;
          candidate_period_index++) {
         OnePeriod &candidate_period = candidate_period_vec[candidate_period_index];
         int candidate_period_int = candidate_period.period_int;
@@ -988,10 +1024,19 @@ OnePeriod Infer::infer_best_period_by_logL(vector<OnePeriod> &candidate_period_v
             cerr << fmt::format(" ploidy: {}\n", candidate_period.best_ploidy);
             cerr << fmt::format(" logL: {}\n", candidate_period.logL);
         }
-        if (candidate_period.best_purity>0 && candidate_period.logL > best_period_logL){
-            best_period_logL = candidate_period.logL;
-            _first_peak_obj = candidate_period.first_peak_obj;
-            best_period_obj = candidate_period;
+        if (custom_period_id > 0) {
+            if (custom_period_id == candidate_period_index + 1) {
+                best_period_logL = candidate_period.logL;
+                _first_peak_obj = candidate_period.first_peak_obj;
+                best_period_obj = candidate_period;
+            }
+        } else {
+            if (candidate_period.best_purity > 0
+                && candidate_period.logL > best_period_logL){
+                best_period_logL = candidate_period.logL;
+                _first_peak_obj = candidate_period.first_peak_obj;
+                best_period_obj = candidate_period;
+            }
         }
         _periodObjVector.push_back(candidate_period);
     }
@@ -2105,7 +2150,7 @@ int main(int argc, char **argv)
                       atof(argv[5]),
                       atoi(argv[6]), atof(argv[7]),
                       atoi(argv[8]),
-                      atoi(argv[9]), atoi(argv[10]),argv[11]);
+                      atoi(argv[9]), atoi(argv[10]),argv[11], atoi(argv[12]));
     int returnCode = infInstance.run();
     exit(returnCode);
 }

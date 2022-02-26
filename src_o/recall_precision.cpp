@@ -3,7 +3,7 @@
  * recall_precision.cpp
  *
  *  Created on: 2017.2.17
- *      Author: fanxp
+ *      Author: Xinping Fan, 897488736@qq.com
  */
 
 #include "singly_linked_list.h"

@@ -1,3 +1,7 @@
+/*
+ Author:
+ Yu S. Huang, polyactis@gmail.com
+ */
 #pragma once
 #ifndef __READ_PARA_H
 #define __READ_PARA_H

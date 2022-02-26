@@ -1,3 +1,8 @@
+/*
+ Author:
+ Xinping Fan, 897488736@qq.com
+
+ */
 #include "model_selection.h"
 #include <algorithm>
 #include <cmath>

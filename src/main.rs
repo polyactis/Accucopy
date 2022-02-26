@@ -1,3 +1,8 @@
+/*
+Author:
+ Yu S. Huang, polyactis@gmail.com
+ Xinping Fan, 897488736@qq.com
+ */
 extern crate users;
 extern crate clap;
 extern crate time;
@@ -14,13 +19,13 @@ use users::{get_user_by_uid, get_current_uid};
 
 fn main() {
     let matches = App::new("Accucopy")
-        .version("cce96cee-014TKBC3-debug")
+        .version("ffcabfdb-SLT8YQBI-debug")
         .author("www.yfish.org")
         .about("A program that infers tumor purity, ploidy from tumor-normal WGS data")
         .subcommand(SubCommand::with_name("gc_index")
             .about("GC indexing for a reference genome, counting the number of GCs in \
                     overlapping windows of 1/5/25/125bp")
-            .version("cce96cee-014TKBC3-debug")
+            .version("ffcabfdb-SLT8YQBI-debug")
             .author("www.yfish.org")
             .arg(Arg::with_name("input_file")
                 .short("i")
@@ -48,7 +53,7 @@ fn main() {
                 (divided by total fragment count) coverage of tumor and normal. \
                 And output coverage ratio \
                 (tumor/normal).")
-            .version("cce96cee-014TKBC3-debug")
+            .version("ffcabfdb-SLT8YQBI-debug")
             .author("www.yfish.org")
             .arg(Arg::with_name("read_len")
                 .short("l")
@@ -132,7 +137,7 @@ fn main() {
         )
         .subcommand(SubCommand::with_name("select_het_snp")
             .about("Select heterozygous SNPs")
-            .version("cce96cee-014TKBC3-debug")
+            .version("ffcabfdb-SLT8YQBI-debug")
             .author("www.yfish.org")
             .arg(Arg::with_name("max_coverage")
                 .short("x")
@@ -176,7 +181,7 @@ fn main() {
         )
         .subcommand(SubCommand::with_name("infer")
             .about("infers tumor purity, ploidy from tumor-normal WGS data")
-            .version("cce96cee-014TKBC3-debug")
+            .version("ffcabfdb-SLT8YQBI-debug")
             .author("www.yfish.org")
             .arg(Arg::with_name("config")
                 .short("c")
@@ -189,7 +194,7 @@ fn main() {
         )
         .subcommand(SubCommand::with_name("recall_precision")
             .about("calculate recall and precision from truth result and predicted result")
-            .version("cce96cee-014TKBC3-debug")
+            .version("ffcabfdb-SLT8YQBI-debug")
             .author("www.yfish.org")
             .arg(Arg::with_name("truth_result_file_path")
                 .short("t")

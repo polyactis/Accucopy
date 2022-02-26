@@ -1,4 +1,8 @@
-
+/*
+Author:
+ Yu S. Huang, polyactis@gmail.com
+ Xinping Fan, 897488736@qq.com
+ */
 use flate2;
 use flate2::Compression;
 use rust_htslib::bam;

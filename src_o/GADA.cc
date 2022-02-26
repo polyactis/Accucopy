@@ -1,22 +1,21 @@
 /*
- GADA v1.0 Genome Alteration Detection Algorithm
- Copyright (C) 2008  Childrens Hospital of Los Angeles
+ eGADA enhanced Genome Alteration Detection Algorithm
 
- GADA is free software: you can redistribute it and/or modify
+ eGADA is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
  the Free Software Foundation, either version 3 of the License, or
  any later version.
 
- GADA is distributed in the hope that it will be useful,
+ eGADA is distributed in the hope that it will be useful,
  but WITHOUT ANY WARRANTY; without even the implied warranty of
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  GNU General Public License for more details.
 
  You should have received a copy of the GNU General Public License
- along with GADA.  If not, see <http://www.gnu.org/licenses/>.
+ along with eGADA.  If not, see <http://www.gnu.org/licenses/>.
 
  Author:
- Roger Pique-Regi    piquereg@usc.edu
+ Yu S. Huang, polyactis@gmail.com
 
  */
 #include <boost/program_options.hpp>  //for program options
