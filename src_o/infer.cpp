@@ -926,7 +926,7 @@ OnePeriod Infer::infer_best_period_by_logL(vector<OnePeriod> &candidate_period_v
             default: break;
         }
         string warn_msg = fmt::format(
-            "Warning: {}{}period will be forced to use!\n",
+            "Warning: {}{} period will be forced to use!\n",
             custom_period_id, suffix);
         cerr << warn_msg;
     }

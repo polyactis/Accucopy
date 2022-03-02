@@ -537,9 +537,9 @@ if __name__ == '__main__':
         "0 means detected automatically by program, 1 means use the 1st period. "
         "2 means use the 2nd period, etc. Default is %(default)s")
     args = ap.parse_args()
-    if (ap.period < 0):
+    if (args.period < 0):
         msg = (f"Argument `period` is non-negative integer-value, but you have "
-               f"specified {ap.period}. O will be used instead.")
+               f"specified {args.period}. O will be used instead.")
         sys.stderr.write(msg)
     wflow = MainFlow(args.configure_filepath, args.tumor_bam, args.normal_bam,
         output_dir=args.output_dir,
@@ -550,7 +550,7 @@ if __name__ == '__main__':
         no_of_autosomes=args.no_of_autosomes,
         clean=args.clean, step=args.step, debug=args.debug, auto=args.auto,
         max_no_of_peaks_for_logL=args.max_no_of_peaks_for_logL,
-        nCores=args.nCores)
+        nCores=args.nCores, custom_period_id=args.period)
     wflow.readConfigureFile(args.configure_filepath)
     wflow.readDictFile()
     retval = wflow.run(mode="local", nCores=args.nCores,
