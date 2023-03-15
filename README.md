@@ -4,7 +4,7 @@ Accucopy is a CNA-calling method that extends our previous Accurity model to pre
 
 ## Publication
 
-X Fan, G Luo, YS Huang# (2021) BMC Bioinformatics. Accucopy: Accurate and Fast Inference of Allele-specific Copy Number Alterations from Low-coverage Low-purity Tumor Sequencing Data.
+X Fan, G Luo, YS Huang# (2021) BMC Bioinformatics. Accucopy: Accurate and Fast Inference of Allele-specific Copy Number Alterations from Low-coverage Low-purity Tumor Sequencing Data. https://doi.org/10.1186/s12859-020-03924-5
 
 
 # Compile
