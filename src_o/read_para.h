@@ -41,8 +41,6 @@ const int MAX_READ_COUNT = 300;  // 20170124 was 200 before
 // const int COEF3 = MAX_READ_COUNT;
 const int LARGE = GC_RATIO_RESOLUTION * MAX_READ_COUNT;
 
-float const MIN_PLOIDY = 1.0;
-float const MAX_PLOIDY = 4.0;
 float const SHOULDER_RATIO = 0.8;
 float const SHOULDER_RATIO_LEFT = 0.9;
 float const kGaussianDensityFrontScalar =

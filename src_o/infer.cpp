@@ -28,7 +28,7 @@ Infer::Infer(string configFilepath, string segment_data_input_path,
              float segment_stddev_divider,
              int snp_coverage_min, float snp_coverage_var_vs_mean_ratio,
              int no_of_peaks_for_logL,
-             int debug, int auto_, string refdictFilepath, int custom_period_id)
+             int debug, int auto_, string refdictFilepath, int force_period_id)
         : _configFilepath(configFilepath),
           _segment_data_input_path(segment_data_input_path),
           _snp_data_input_path(snp_data_input_path),
@@ -40,8 +40,9 @@ Infer::Infer(string configFilepath, string segment_data_input_path,
           _debug(debug),
           _auto(auto_),
           _refdictFilepath(refdictFilepath),
-          custom_period_id(custom_period_id)
+          _force_period_id(force_period_id)
 {
+    _min_no_of_snps_for_1_peak = 5; // a hidden parameter for snp logL calc
     _periodObjVector.reserve(5);
     _snp_maf_stddev_divider = 20.0;
     if (_segment_stddev_divider<=0){
@@ -214,15 +215,12 @@ int Infer::run()
 
         if (_period_obj_from_logL.best_purity>0 &&
             _period_obj_from_logL.best_purity<=1 &&
-            _period_obj_from_logL.ploidy_corrected>=MIN_PLOIDY && 
-            _period_obj_from_logL.ploidy_corrected<=MAX_PLOIDY) {
+            _period_obj_from_logL.ploidy_corrected>0) {
             output_logL(_period_obj_from_logL, _periodObjVector);
         } else {
-            cerr << fmt::format("ERROR: best_purity {} not in (0,1] or ploidy_corrected {} not in [{}, {}].\n",
+            cerr << fmt::format("ERROR: best_purity {} not in (0,1] or ploidy_corrected {} below 0.\n",
                                 _period_obj_from_logL.purity_corrected,
-                                _period_obj_from_logL.ploidy_corrected,
-                                MIN_PLOIDY,
-                                MAX_PLOIDY);
+                                _period_obj_from_logL.ploidy_corrected);
         }
         if (_debug > 0) {
             output_snp_logOR_by_peak(_period_obj_from_logL.peak_obj_vector);
@@ -902,9 +900,9 @@ OnePeriod Infer::infer_best_period_by_logL(vector<OnePeriod> &candidate_period_v
                         candidate_periods_size);
     double best_period_logL = (-1e99);
     OnePeriod best_period_obj = OnePeriod();
-    if (custom_period_id > candidate_periods_size) {
+    if (_force_period_id > candidate_periods_size) {
         string suffix = "th";
-        switch(custom_period_id) {
+        switch(_force_period_id) {
             case 1: suffix = "st"; break;
             case 2: suffix = "nd"; break;
             case 3: suffix = "rd"; break;
@@ -914,12 +912,12 @@ OnePeriod Infer::infer_best_period_by_logL(vector<OnePeriod> &candidate_period_v
             "Warning: periods have {} candidates, but you have specified to use " \
             "{}{} period. This setting will be ignored and which period to use "
             "will be detected automatically.\n",
-            candidate_periods_size, custom_period_id, suffix);
-        custom_period_id = 0;
+            candidate_periods_size, _force_period_id, suffix);
+        _force_period_id = 0;
         cerr << warn_msg;
-    } else if (custom_period_id > 0) {
+    } else if (_force_period_id > 0) {
         string suffix = "th";
-        switch(custom_period_id) {
+        switch(_force_period_id) {
             case 1: suffix = "st"; break;
             case 2: suffix = "nd"; break;
             case 3: suffix = "rd"; break;
@@ -927,7 +925,7 @@ OnePeriod Infer::infer_best_period_by_logL(vector<OnePeriod> &candidate_period_v
         }
         string warn_msg = fmt::format(
             "Warning: {}{} period will be forced to use!\n",
-            custom_period_id, suffix);
+            _force_period_id, suffix);
         cerr << warn_msg;
     }
     for (int candidate_period_index = 0;
@@ -1024,8 +1022,8 @@ OnePeriod Infer::infer_best_period_by_logL(vector<OnePeriod> &candidate_period_v
             cerr << fmt::format(" ploidy: {}\n", candidate_period.best_ploidy);
             cerr << fmt::format(" logL: {}\n", candidate_period.logL);
         }
-        if (custom_period_id > 0) {
-            if (custom_period_id == candidate_period_index + 1) {
+        if (_force_period_id > 0) {
+            if (_force_period_id == candidate_period_index + 1) {
                 best_period_logL = candidate_period.logL;
                 _first_peak_obj = candidate_period.first_peak_obj;
                 best_period_obj = candidate_period;
@@ -1225,7 +1223,7 @@ double Infer::infer_no_of_copy_nos_bf_1st_peak_for_one_period_by_logL_snp(
     }
     if (_debug>0) {
         cerr << fmt::format("  no_of_copy_nos_bf_1st_peak_prior={}\n  max_no_of_copy_nos_bf_1st_peak={}\n",
-                            no_of_copy_nos_bf_1st_peak_prior, max_no_of_copy_nos_bf_1st_peak);
+                no_of_copy_nos_bf_1st_peak_prior, max_no_of_copy_nos_bf_1st_peak);
     }
     OneSegmentSNPs oneSegmentSNPs;
 
@@ -1242,17 +1240,27 @@ double Infer::infer_no_of_copy_nos_bf_1st_peak_for_one_period_by_logL_snp(
         }
         calc_purity_ploidy_from_period_and_cp_no_two(
                 cp_no_two_rc_ratio_int, period_int, purity, ploidy);
-        if (ploidy < MIN_PLOIDY || ploidy > MAX_PLOIDY) continue;
+        
+        if (_debug>0){
+            cerr << fmt::format("  purity = {}, ploidy = {}\n", 
+                purity, ploidy);
+        }
+
+        if (ploidy < 0){
+            cerr << fmt::format("WARN: ploidy {} has to be above 0. Skip!\n", 
+                ploidy);
+            continue;
+        }
         if (purity >= 1 && purity < 1.1) {
-            cerr << fmt::format("WARNING: purity = {}, set to 0.99\n", purity);
+            cerr << fmt::format("WARN: purity = {}, set to 0.99\n", purity);
             purity=0.99;
         } else if (purity <= 0 && purity > -0.1){
-            cerr << fmt::format("WARNING: purity = {}, set to 0.03\n", purity);
+            cerr << fmt::format("WARN: purity = {}, set to 0.03\n", purity);
             purity=0.03;
         }
         
         if (purity >= 1.1 || purity <= -0.1) {
-            cerr << fmt::format("WARNING: purity = {}, skip\n", purity);
+            cerr << fmt::format("WARN: purity = {}, invalid. Skip!\n", purity);
             continue; 
         }
         // reset
@@ -1264,7 +1272,13 @@ double Infer::infer_no_of_copy_nos_bf_1st_peak_for_one_period_by_logL_snp(
             double logL_of_one_logOR_peak = 0;
             OnePeak &peak_obj = peak_obj_vector[peak_index];
             int cp = no_of_copy_nos_bf_1st_peak + peak_index;
-            if (peak_obj.no_of_snps <= 5) continue;
+            if (peak_obj.no_of_snps <= _min_no_of_snps_for_1_peak){
+                if (_debug>0){
+                    cerr << fmt::format("WARN: peak {} has only {} SNPs, too few! Skip.", 
+                        peak_index, peak_obj.no_of_snps);
+                }
+                continue;
+            }
 
             candidate_period.no_of_logOR_peaks += cp / 2 + 1;
             peak_obj.no_of_logOR_peaks = cp / 2 + 1;
@@ -1274,7 +1288,7 @@ double Infer::infer_no_of_copy_nos_bf_1st_peak_for_one_period_by_logL_snp(
                    peak_obj_vector[peak_index].segment_obj_vector.end();
                    one_segment_iterator++) {
                 oneSegmentSNPs = one_segment_iterator->oneSegmentSNPs;
-                if (oneSegmentSNPs.no_of_snps <= 5)
+                if (oneSegmentSNPs.no_of_snps <= _min_no_of_snps_for_1_peak)
                     continue;
                 //if all logOR in the segments is the same value, skip.
                 double mean = std::accumulate(oneSegmentSNPs.logOR_list.begin(),
@@ -1313,7 +1327,7 @@ double Infer::infer_no_of_copy_nos_bf_1st_peak_for_one_period_by_logL_snp(
 
         }  // each rc peak
         //     logL_snp = (-log(maf_stddev) * candidate_period.no_of_snps);
-        if (candidate_period.no_of_snps<=5) {
+        if (candidate_period.no_of_snps <= _min_no_of_snps_for_1_peak) {
             continue;
         }
         float snp_logL_penalty =

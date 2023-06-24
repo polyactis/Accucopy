@@ -24,7 +24,7 @@ class MainFlow(WorkflowRunner):
         no_of_autosomes=22,
         clean=False,
         step=0, debug=False, auto=1,
-        max_no_of_peaks_for_logL=3, nCores=4, custom_period_id=0, **keywords):
+        max_no_of_peaks_for_logL=3, nCores=4, force_period_id=0, **keywords):
         self.configure_filepath = configure_filepath
         self.tumor_bam = tumor_bam
         self.normal_bam = normal_bam
@@ -41,7 +41,7 @@ class MainFlow(WorkflowRunner):
         self.max_no_of_peaks_for_logL = max_no_of_peaks_for_logL
         self.nCores = nCores
         self.strelka_cores = max(1, self.nCores-2)
-        self.custom_period_id = custom_period_id
+        self.force_period_id = force_period_id
 
         if not os.path.isdir(self.output_dir):
             os.mkdir(self.output_dir)
@@ -382,7 +382,7 @@ class MainFlow(WorkflowRunner):
                 f"{self.snp_coverage_var_vs_mean_ratio} "\
                 f"{self.max_no_of_peaks_for_logL} {self.debug} {self.auto} "\
                 f"{os.path.join(self.ref_folder_path, 'genome.dict')} "\
-                f"{self.custom_period_id} "\
+                f"{self.force_period_id} "\
                 f" 2>&1 | tee -a {self.infer_status_out_path}"
             infer_job = self.addTask("infer", cmd, 
                 dependencies=[reduce_all_segments_job, call_het_snps_tumor_job])
@@ -531,15 +531,16 @@ if __name__ == '__main__':
         "to detect the period in the read-count ratio histogram. "
         "0: the simple auto-correlation method. "
         "1: a GADA-based algorithm (recommended). Default is %(default)s.")
-    ap.add_argument("--period", type=int, default=0,
-        help="The non-negative integer-valued argument that force which period "
-        "to use during inferring. "
-        "0 means detected automatically by program, 1 means use the 1st period. "
-        "2 means use the 2nd period, etc. Default is %(default)s")
+    ap.add_argument("--force_period_id", type=int, default=0,
+        help="The non-negative integer-valued argument that force the program "
+        "to use which period, instead of relying on max likelihood. "
+        "0: use the one inferred automatically by the program; "
+        "1: force-use the 1st period; "
+        "2: force-use the 2nd period, etc. Max is 3. Default is %(default)s")
     args = ap.parse_args()
-    if (args.period < 0):
+    if (args.force_period_id < 0):
         msg = (f"Argument `period` is non-negative integer-value, but you have "
-               f"specified {args.period}. O will be used instead.")
+               f"specified {args.force_period_id}. O will be used instead.")
         sys.stderr.write(msg)
     wflow = MainFlow(args.configure_filepath, args.tumor_bam, args.normal_bam,
         output_dir=args.output_dir,
@@ -550,7 +551,7 @@ if __name__ == '__main__':
         no_of_autosomes=args.no_of_autosomes,
         clean=args.clean, step=args.step, debug=args.debug, auto=args.auto,
         max_no_of_peaks_for_logL=args.max_no_of_peaks_for_logL,
-        nCores=args.nCores, custom_period_id=args.period)
+        nCores=args.nCores, force_period_id=args.force_period_id)
     wflow.readConfigureFile(args.configure_filepath)
     wflow.readDictFile()
     retval = wflow.run(mode="local", nCores=args.nCores,

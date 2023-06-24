@@ -190,7 +190,7 @@ class Infer {
           float segment_stddev_divider,
           int snp_coverage_min, float snp_coverage_var_vs_mean_ratio,
           int no_of_peaks_for_logL,
-          int debug, int auto_, string refdictFilepath, int custom_period_id);
+          int debug, int auto_, string refdictFilepath, int force_period_id);
     ~Infer();
     int run();
 
@@ -254,7 +254,8 @@ class Infer {
     int _debug;
     int _auto;
     int _returnCode;
-    int custom_period_id; // user specify period to use
+    int _force_period_id; // Force to select whichever period to use, not via logL
+    int _min_no_of_snps_for_1_peak; // min #SNPs for one peak to be included in SNP logL calc
 
     Config _config;
     RefDictInfo ref_dict_info;
