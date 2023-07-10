@@ -64,7 +64,7 @@ impl<'a> SelectHetSNP<'a> {
                               no_of_good_hets_in_normal: 0,no_of_good_hets: 0};
         for rec in vcf.records() {
             snp_summary.no_of_total_records += 1;
-            let mut record = rec.ok().expect("Error reading record.");
+            let record = rec.ok().expect("Error reading record.");
             let sample_1_genotype: String;
             let _sample_2_genotype: String;
             {
