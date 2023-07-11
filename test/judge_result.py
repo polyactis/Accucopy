@@ -12,7 +12,7 @@ if __name__ == '__main__':
 	parser.add_argument('-v', '--max_purity_delta', default=0.05, help="deviation between true and estimated purity.")
 	parser.add_argument('-e', '--max_ploidy_delta', default=0.3, help="deviation between true and estimated ploidy.")
 	args = parser.parse_args()
-	commit_id = os.environ.get('CI_BUILD_REF')[:8]
+	commit_id = os.environ.get('CI_COMMIT_SHA')[:8]
 	true_purity = float(args.true_purity)
 	true_ploidy = float(args.true_ploidy)
 	max_purity_delta = float(args.max_purity_delta)

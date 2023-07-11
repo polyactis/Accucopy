@@ -1,6 +1,6 @@
 #!/bin/bash
 exit_code=0
-commit_id=${CI_BUILD_REF:0:8}
+commit_id=${CI_COMMIT_SHA:0:8}
 
 echo "Start to plot results of commit ID $commit_id.."
 destfile=/y/hlab/AccurityTestData/gitlab_run/run_result.tsv

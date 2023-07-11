@@ -1,6 +1,6 @@
 #!/bin/bash
 exit_code=0
-commit_id=${CI_BUILD_REF:0:8}
+commit_id=${CI_COMMIT_SHA:0:8}
 
 data=$1
 cp_judge_flag=$2
