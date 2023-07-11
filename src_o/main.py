@@ -429,9 +429,9 @@ class MainFlow(WorkflowRunner):
                 #plot the auto_cor diff program
                 autocorPath =os.path.join(self.output_dir, "auto.tsv")
                 cmd = f"{os.path.join(self.binary_folder, 'plot_autocor_diff.py')} "\
-                    f"-i {os.path.join(self.output_dir, 'GADA.in.tsv')} "\
+                    f"-i {os.path.join(self.output_dir, 'candidate.period.GADA.in.tsv')} "\
                     f"-o {os.path.join(self.output_dir, 'plot.tre.autocor.png')} "\
-                    f"-s {os.path.join(self.output_dir, 'GADA.out.tsv')} "\
+                    f"-s {os.path.join(self.output_dir, 'candidate.period.GADA.out.tsv')} "\
                     f"-a {autocorPath}"
                 plot_autocor_diff_job = self.addTask("plot_autocor_diff", cmd, \
                     dependencies=infer_job)
