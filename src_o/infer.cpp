@@ -440,7 +440,7 @@ vector<OnePeriod> Infer:: infer_candidate_period_by_GADA(double* all_diff,
     double BaseAmp=0.0;
     double a=0.5; //SBL hyper prior parameter
     double T=5.0; //backward elimination threshold
-    long MinSegLen=10; // minimal length of a segment
+    long MinSegLen=3; // minimal length of a segment
     long debug=0;// verbosity ... set equal to 1 to see messages of SBLandBE(). 0 to not see them
     double convergenceDelta=1E-8;//1E-10 or 1E-8 seems to work well for this parameter. -- => ++ conv time
     //1E8 better than 1E10 seems to work well for this parameter. -- => -- conv time
