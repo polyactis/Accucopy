@@ -8,6 +8,7 @@ after_script:
 stages:
   - build_d
   - build_r
+  - test_0
   - test_1
   - test_2
 
@@ -21,7 +22,7 @@ build_debug:
     - mv debug ../software
     - pwd
   artifacts:
-    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
     expire_in: 4 yrs
     paths:
     - software
@@ -35,7 +36,7 @@ build_release:
     - mv release ../software
     - pwd
   artifacts:
-    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
     expire_in: 4 yrs
     paths:
     - software
@@ -44,15 +45,26 @@ build_release:
 
 
 HCC1187_10X_0_1_noise_20:
-  stage: test_1
+  stage: test_0
   script:
-    - echo "Test HCC1187_10X_0.1_noise_20";
+    - input_dir=/y/hlab/AccurityTestData/HCC1187/mixed_sample/
+    - cna_truth_file=/y/hlab/AccurityTestData/HCC1187/hcc1187_truth.tsv
+    - true_purity=0.1
+    - output_dir=HCC1187_10X_0_1_noise_20
+    - echo "Test ${output_dir}";
     - pwd; ls
-    - test/test_tcga.py -f /y/hlab/AccurityTestData/HCC1187/mixed_sample/ -t purity_0.1 -n normal_5X -c 4 -o HCC1187_10X_0_1_noise_20 -w pyflow
-    - test/judge_result.py -i HCC1187_10X_0_1_noise_20/infer.out.tsv -u 0.077 -d 2.7
+    - test/test_tcga.py -f ${input_dir}
+      --segment_stddev_divider 20 -t purity_${true_purity} -n normal_5X -c 4
+      -o ${output_dir} -w pyflow
+    - ./src_o/plotCPandMCP.py -t ${cna_truth_file}
+      -r /y/hlab/AccurityTestData/hs38d1/genome.dict
+      -i ${output_dir}/cnv.output.tsv
+      -o ${output_dir}/plot.cnv.vs.true.purity${true_purity}.png
+    - test/judge_result.py -i ${output_dir}/infer.out.tsv -u 0.077 -d 2.7
+  needs: ["build_debug"]
   artifacts:
     when: always
-    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
     expire_in: 12 mos
     paths:
     - HCC1187_10X_0_1_noise_20/
@@ -68,7 +80,7 @@ HCC1187_10X_0_3_noise_10:
     - test/judge_result.py -i HCC1187_10X_0_3_noise_10/infer.out.tsv -u 0.241 -d 2.7
   artifacts:
     when: always
-    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
     expire_in: 12 mos
     paths:
     - HCC1187_10X_0_3_noise_10/
@@ -85,7 +97,7 @@ HCC1187_10X_0_4_noise_10:
     - test/judge_result.py -i HCC1187_10X_0_4_noise_10/infer.out.tsv -u 0.331 -d 2.7
   artifacts:
     when: always
-    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
     expire_in: 12 mos
     paths:
     - HCC1187_10X_0_4_noise_10/
@@ -101,7 +113,7 @@ HCC1187_10X_0_6_noise_20:
     - test/judge_result.py -i HCC1187_10X_0_6_noise_20/infer.out.tsv -u 0.526 -d 2.7
   artifacts:
     when: always
-    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
     expire_in: 12 mos
     paths:
     - HCC1187_10X_0_6_noise_20/
@@ -117,7 +129,7 @@ HCC1187_10X_0_6:
     - test/judge_result.py -i HCC1187_10X_0_6/infer.out.tsv -u 0.526 -d 2.7
   artifacts:
     when: always
-    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
     expire_in: 12 mos
     paths:
     - HCC1187_10X_0_6/
@@ -133,7 +145,7 @@ SNP_HCC1187_10X_0_6:
     - test/judge_result.py -i HCC1187_10X_0_6/infer.out.tsv -u 0.526 -d 2.7
   artifacts:
     when: always
-    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
     expire_in: 12 mos
     paths:
     - HCC1187_10X_0_6/
@@ -149,7 +161,7 @@ HCC1187_10X_0_9:
     - test/judge_result.py -i HCC1187_10X_0_9/infer.out.tsv -u 0.87 -d 2.7
   artifacts:
     when: always
-    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
     expire_in: 12 mos
     paths:
     - HCC1187_10X_0_9/
@@ -165,7 +177,7 @@ HCC1187_10X_0_9:
 #    - test/judge_result.py -i 40X_574_580_06_5411_Broad_noise_20/infer.out.tsv -u 0.6 -d 2.5 --max_purity_delta 0.3 --max_ploidy_delta 1.3
 #  artifacts:
 #    when: always
-#    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+#    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
 #    expire_in: 12 mos
 #    paths:
 #    - 40X_574_580_06_5411_Broad_noise_20/
@@ -181,7 +193,7 @@ HCC1187_10X_0_9:
 #    - test/judge_result.py -i 40X_574_580__06_5411_Broad/infer.out.tsv -u 0.6 -d 2.5 --max_purity_delta 0.3 --max_ploidy_delta 1.3
 #  artifacts:
 #    when: always
-#    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+#    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
 #    expire_in: 12 mos
 #    paths:
 #    - 40X_574_580__06_5411_Broad/
@@ -197,7 +209,7 @@ tcga35X_586_595_19_2624_noise_20:
     - test/judge_result.py -i 35X_586_595_19_2624_Broad_noise_20/infer.out.tsv -u 0.94571 -d 1.89 --max_purity_delta 0.1 --max_ploidy_delta 0.3
   artifacts:
     when: always
-    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
     expire_in: 12 mos
     paths:
     - 35X_586_595_19_2624_Broad_noise_20/
@@ -213,7 +225,7 @@ tcga35X_586_595_19_2624_noise_20:
 #    - test/judge_result.py -i 35X_586_595__19_2624_Broad/infer.out.tsv -u 0.85 -d 2.0 --max_purity_delta 0.1 --max_ploidy_delta 0.3
 #  artifacts:
 #    when: always
-#    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+#    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
 #    expire_in: 12 mos
 #    paths:
 #    - 35X_586_595__19_2624_Broad/
@@ -221,15 +233,20 @@ tcga35X_586_595_19_2624_noise_20:
 #    - build_debug
 
 tcga7X_1590_96__AO_AOJJ_HMS:
-  stage: test_1
+  stage: test_0
   script:
     - echo "Test 1590_96_TCGA-AO-A0JJ_HMS_CGCC_vs_633_by_method5_realigned0_reduced0";
     - pwd
-    - test/test_tcga.py -r hs38d1 -f /y/Sunset/db/individual_alignment/ -t 1590_96_TCGA-AO-A0JJ_HMS_CGCC_vs_633_by_method5_realigned0_reduced0 -n 1574_80_TCGA-AO-A0JJ_HMS_CGCC_vs_633_by_method5_realigned0_reduced0 -c 4 -o 7X_1590_96__AO_AOJJ_HMS -w pyflow
-    - test/judge_result.py -i 7X_1590_96__AO_AOJJ_HMS/infer.out.tsv -u 0.50245 -d 1.9693 --max_purity_delta 0.3 --max_ploidy_delta 1
+    - test/test_tcga.py -r hs38d1 -f /y/Sunset/db/individual_alignment/
+      -t 1590_96_TCGA-AO-A0JJ_HMS_CGCC_vs_633_by_method5_realigned0_reduced0
+      -n 1574_80_TCGA-AO-A0JJ_HMS_CGCC_vs_633_by_method5_realigned0_reduced0
+      -c 4 -o 7X_1590_96__AO_AOJJ_HMS -w pyflow
+    - test/judge_result.py -i 7X_1590_96__AO_AOJJ_HMS/infer.out.tsv -u 0.50245
+      -d 1.9693 --max_purity_delta 0.3 --max_ploidy_delta 1
+  needs: ["build_debug"]
   artifacts:
     when: always
-    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
     expire_in: 12 mos
     paths:
     - 7X_1590_96__AO_AOJJ_HMS/
@@ -245,7 +262,7 @@ tcga7X_1590_96_AO_AOJJ_noise_20:
     - test/judge_result.py -i 7X_1590_96_AO_AOJJ_HMS_noise_20/infer.out.tsv -u 0.50491 -d 1.9745 --max_purity_delta 0.3 --max_ploidy_delta 1
   artifacts:
     when: always
-    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
     expire_in: 12 mos
     paths:
     - 7X_1590_96_AO_AOJJ_HMS_noise_20/
@@ -261,7 +278,7 @@ tcga3X_1125_431_AA_3968:
     - test/judge_result.py -i 3X_1125_431__AA_3968_HMS/infer.out.tsv -u 0.55417 -d 2.1484 --max_purity_delta 0.1 --max_ploidy_delta 0.3
   artifacts:
     when: always
-    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
     expire_in: 12 mos
     paths:
     - 3X_1125_431__AA_3968_HMS
@@ -277,7 +294,7 @@ tcga3X_1125_431_AA_3968_divider_20:
     - test/judge_result.py -i 3X_1125_431_AA_3968_HMS_divider20/infer.out.tsv -u 0.60518 -d 2.0896 --max_purity_delta 0.1 --max_ploidy_delta 0.3
   artifacts:
     when: always
-    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
     expire_in: 12 mos
     paths:
     - 3X_1125_431_AA_3968_HMS_divider20
@@ -293,7 +310,7 @@ singleclone_5x_0_1_noise_20:
     - test/judge_simulation_result.sh singleclone_5x 1 0
   artifacts:
     when: always
-    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
     expire_in: 12 mos
     paths:
     - singleclone_5x/purity.*/infer_result_debug
@@ -310,7 +327,7 @@ singleclone_5x_0_5:
     - test/judge_simulation_result.sh singleclone_5x 1 1
   artifacts:
     when: always
-    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
     expire_in: 12 mos
     paths:
     - singleclone_5x/purity.*/infer_result_debug
@@ -327,7 +344,7 @@ singleclone_5x_0_5_noise_20:
     - test/judge_simulation_result.sh singleclone_5x 1 1
   artifacts:
     when: always
-    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
     expire_in: 12 mos
     paths:
     - singleclone_5x/purity.*/infer_result_debug
@@ -345,7 +362,7 @@ singleclone_5x_0_9:
     - test/judge_simulation_result.sh singleclone_5x 1 1
   artifacts:
     when: always
-    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
     expire_in: 12 mos
     paths:
     - singleclone_5x/purity.*/infer_result_debug
@@ -362,7 +379,7 @@ singleclone_1percSNP_0_1:
     - test/judge_simulation_result.sh singleclone_1_of_100snp 1 0
   artifacts:
     when: always
-    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
     expire_in: 12 mos
     paths:
     - singleclone_1_of_100snp/purity.*/infer_result_debug
@@ -379,7 +396,7 @@ singleclone_1percSNP_0_5:
     - test/judge_simulation_result.sh singleclone_1_of_100snp 1 1
   artifacts:
     when: always
-    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
     expire_in: 12 mos
     paths:
     - singleclone_1_of_100snp/purity.*/infer_result_debug
@@ -396,7 +413,7 @@ singleclone_1percSNP_0_9:
     - test/judge_simulation_result.sh singleclone_1_of_100snp 1 1
   artifacts:
     when: always
-    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
     expire_in: 12 mos
     paths:
     - singleclone_1_of_100snp/purity.*/infer_result_debug
@@ -414,7 +431,7 @@ subclone_2_0_1_noise_20:
     - test/judge_simulation_result.sh subclone_2 1 0
   artifacts:
     when: always
-    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
     expire_in: 12 mos
     paths:
     - subclone_2/purity.*/infer_result_debug
@@ -431,7 +448,7 @@ subclone_2_0_5_noise_20:
     - test/judge_simulation_result.sh subclone_2 1 1
   artifacts:
     when: always
-    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
     expire_in: 12 mos
     paths:
     - subclone_2/purity.*/infer_result_debug
@@ -448,7 +465,7 @@ subclone_2_0_5:
     - test/judge_simulation_result.sh subclone_2 1 1
   artifacts:
     when: always
-    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
     expire_in: 12 mos
     paths:
     - subclone_2/purity.*/infer_result_debug
@@ -465,7 +482,7 @@ SNP_subclone_2_0_5:
     - test/judge_simulation_result.sh subclone_2 1 1
   artifacts:
     when: always
-    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
     expire_in: 12 mos
     paths:
     - subclone_2/purity.*/infer_result_debug
@@ -483,7 +500,7 @@ subclone_3_0_5:
     - test/judge_simulation_result.sh subclone_3 1 1
   artifacts:
     when: always
-    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
     expire_in: 12 mos
     paths:
     - subclone_3/purity.*/infer_result_debug
@@ -500,7 +517,7 @@ subclone_3_0_5:
 #    - test/judge_simulation_result.sh WGD_purity0.7
 #  artifacts:
 #    when: always
-#    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+#    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
 #    expire_in: 12 mos
 #    paths:
 #    - WGD_purity0.7/purity.*/infer_result_debug
@@ -517,7 +534,7 @@ subclone_3_0_5:
 #    - test/judge_simulation_result.sh WGD_purity0.7
 #  artifacts:
 #    when: always
-#    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+#    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
 #    expire_in: 12 mos
 #    paths:
 #    - WGD_purity0.7/purity.*/infer_result_debug
@@ -534,7 +551,7 @@ subclone_3_0_5:
     - test/judge_result.py -i 5M_single_mutant/purity.0.7/infer_result_debug/infer.out.tsv -u 0.7 -d 2.0 --max_purity_delta 0.1 --max_ploidy_delta 0.2
   artifacts:
     when: always
-    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
     expire_in: 12 mos
     paths:
     - 5M_single_mutant/purity.*/infer_result_debug
@@ -551,7 +568,7 @@ subclone_3_0_5:
     - test/judge_result.py -i 5M_single_mutant/purity.0.7/infer_result_debug/infer.out.tsv -u 0.7 -d 2.0 --max_purity_delta 0.1 --max_ploidy_delta 0.2
   artifacts:
     when: always
-    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
     expire_in: 12 mos
     paths:
     - 5M_single_mutant/purity.*/infer_result_debug
@@ -566,7 +583,7 @@ subclone_3_0_5:
 #    - pwd
 #    - test/collect_result.sh
 #  artifacts:
-#    name: "${CI_BUILD_ID}_${CI_BUILD_NAME}_${CI_BUILD_REF_NAME}"
+#    name: "${CI_JOB_ID}_${CI_JOB_NAME}_${CI_COMMIT_REF_NAME}"
 #    expire_in: 4 yrs
 #    paths:
 #    - run_result_png
