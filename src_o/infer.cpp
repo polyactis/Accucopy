@@ -42,9 +42,11 @@ Infer::Infer(string configFilepath, string segment_data_input_path,
           _refdictFilepath(refdictFilepath),
           _force_period_id(force_period_id)
 {
+    // private class-wide parameters.
     _min_no_of_snps_for_1_peak = 5; // a hidden parameter for snp logL calc
     _periodObjVector.reserve(5);
     _snp_maf_stddev_divider = 20.0;
+    _period_min_segment_len = 3;
     if (_segment_stddev_divider<=0){
         cerr << fmt::format("ERROR: _segment_stddev_divider {} less than or equal to 0.\n",
             _segment_stddev_divider);
@@ -348,7 +350,7 @@ void Infer::calculate_autocor()
 void Infer::calc_autocor_shift_diff(double* all_diff, double &left_x, double &right_x) {
     cerr << "Calculating auto correlation shift-1 difference ..." << endl;
     double shift_diff;
-    string tmp_file_path = _output_dir + "/GADA.in.tsv";
+    string tmp_file_path = _output_dir + "/candidate.period.GADA.in.tsv";
     ofstream gada_input_file;
     gada_input_file.open(tmp_file_path.c_str(), ios::trunc);
     gada_input_file << "period" << "\t" << "cor_shift_diff" << "\t" << "round_int" << endl;
@@ -440,7 +442,6 @@ vector<OnePeriod> Infer:: infer_candidate_period_by_GADA(double* all_diff,
     double BaseAmp=0.0;
     double a=0.5; //SBL hyper prior parameter
     double T=5.0; //backward elimination threshold
-    long MinSegLen=3; // minimal length of a segment
     long debug=0;// verbosity ... set equal to 1 to see messages of SBLandBE(). 0 to not see them
     double convergenceDelta=1E-8;//1E-10 or 1E-8 seems to work well for this parameter. -- => ++ conv time
     //1E8 better than 1E10 seems to work well for this parameter. -- => -- conv time
@@ -456,7 +457,7 @@ vector<OnePeriod> Infer:: infer_candidate_period_by_GADA(double* all_diff,
             BaseAmp,
             a,
             T,
-            MinSegLen,
+            (long)_period_min_segment_len,
             debug,
             convergenceDelta,
             maxNoOfInterations,
@@ -471,7 +472,7 @@ vector<OnePeriod> Infer:: infer_candidate_period_by_GADA(double* all_diff,
     if (_debug>0) {
         //output the result
         ofstream _gada_seg_outf;
-        _gada_seg_outf.open(fmt::format("{}/GADA.out.tsv", _output_dir).c_str(), ios::trunc);
+        _gada_seg_outf.open(fmt::format("{}/candidate.period.GADA.out.tsv", _output_dir).c_str(), ios::trunc);
         _gada_seg_outf << "Start" << "\t" << "End" << "\t" << "Length" << "\t" << "Ampl" << endl;
         for (int i = 0; i < baseGADA.K + 1; i++) {
             int period_start = period_int_vec[baseGADA.Iext[i]];
@@ -486,14 +487,14 @@ vector<OnePeriod> Infer:: infer_candidate_period_by_GADA(double* all_diff,
 
     //select the candidate period
     vector<OnePeriod> candidate_period_vec;
-    int min_period_segment_len = 10;
     int max_period_int = 600;
     for (int i = 0; i < baseGADA.K ; i++) {
         double delta = baseGADA.SegAmp[i] - baseGADA.SegAmp[i + 1];
         long current_segment_len = baseGADA.SegLen[i];
         long next_segment_len = baseGADA.SegLen[i+1];
         if (baseGADA.SegAmp[i] > 0 && baseGADA.SegAmp[i + 1] < 0 &&
-            current_segment_len>=min_period_segment_len && next_segment_len >=min_period_segment_len) {
+            current_segment_len>=_period_min_segment_len && 
+            next_segment_len >=_period_min_segment_len) {
             //find the period with highest auto-correlation between positive and negative slopes
             double max_auto_cor = -1;
             int candidate_period_int = -1;

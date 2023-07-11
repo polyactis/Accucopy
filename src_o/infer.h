@@ -256,6 +256,8 @@ class Infer {
     int _returnCode;
     int _force_period_id; // Force to select whichever period to use, not via logL
     int _min_no_of_snps_for_1_peak; // min #SNPs for one peak to be included in SNP logL calc
+    int _period_min_segment_len; // minimal length of a GADA segment in searching for candidate period
+
 
     Config _config;
     RefDictInfo ref_dict_info;
