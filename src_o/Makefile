@@ -23,8 +23,8 @@ README.pdf: README.tex
 	-pdflatex README.tex
 
 #:= is different from =. The latter will cause the function evaluation every time the make variable is invoked.
-#currentUnixTime:=$(shell echo "import time; print str(time.time()).replace('.', '_')"|python)
-currentTime:=$(shell echo "from datetime import datetime; print str(datetime.now()).replace(' ', '_').replace(':', '')"|python)
+#currentUnixTime:=$(shell echo "import time; print(str(time.time()).replace('.', '_'))"|python)
+currentTime:=$(shell echo "from datetime import datetime; print(str(datetime.now()).replace(' ', '_').replace(':', ''))"|python)
 
 
 debug: all ../src/main.rs
